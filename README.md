@@ -5,7 +5,7 @@ We will do some changes to the source code for our own usage.
 Modifications by ziyue:
 2023 April:
 1. Modified file "./configure", such that only MERLIN is compiled since we are only looking at MERLIN for now. We can append this list of compilation in the future. This will save compilation time and avoid wired compilation errors in other libs.
-2. Modified the dragonfly topology, such that it now supports a new parameter "global_link_latency". This is independent from "link_latency".
+2. Modified the dragonfly topology, such that it now supports a new parameter "global_link_latency" (link latency of inter-group links). This is independent from "link_latency" (link latency of intra-group links).
 3. corrected some naming of links in MESH/TORUS topo, in order to avoid some warning.
 
 
