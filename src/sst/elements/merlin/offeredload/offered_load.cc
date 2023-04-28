@@ -174,6 +174,8 @@ void OfferedLoad::finish()
 
 
         // Now, write out a summary table with just the latencies
+        // out.output("%9s %9s\n","size of offered_load is");
+        // out.output("%9.2f", offered_load.size());
 
         out.output("%9s %9s\n","Offered","Average");
         out.output("%9s %9s\n","Load ","Latency");
@@ -343,10 +345,19 @@ OfferedLoad::end_handler(Event* ev) {
         complete_event[generation]->backup = current_time - next_time;
     }
 
-    // See if we are done
+    // See if we are done //this has been editted by ziyue: I reckon that this was not correct
+
+    // /*============original code:=================
     if ( complete_event.size() == offered_load.size() ) {
         primaryComponentOKToEndSim();
     }
+    // =============================================*/
+    // //the following lines are written by ziyue
+    // if ( complete_event.size() == offered_load.size()+1 ) {
+    //     assert(complete_event.size() <= offered_load.size()+1);
+    //     primaryComponentOKToEndSim();
+    // }
+    // //=======================================
     else {
 
         // Need to set things up for the next iteration
