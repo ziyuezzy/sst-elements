@@ -143,7 +143,7 @@ LinkControl::LinkControl(ComponentId_t cid, Params &params, int vns) :
 
 
     // Register statistics
-    packet_latency = registerStatistic<uint64_t>("packet_latency");
+    // packet_latency = registerStatistic<uint64_t>("packet_latency"); //TODO: add network-independent source queue for plat
     network_latency = registerStatistic<uint64_t>("network_latency");//added by ziyue
     send_bit_count = registerStatistic<uint64_t>("send_bit_count");
     output_port_stalls = registerStatistic<uint64_t>("output_port_stalls");
@@ -423,7 +423,7 @@ void LinkControl::finish(void)
 
 // Returns true if there is space in the output buffer and false
 // otherwise.
-bool LinkControl::send(SimpleNetwork::Request* req, int vn) {
+bool LinkControl::send(SimpleNetwork::Request* req, int vn) { //TODO: additional parameter of overload function -- time of packet creation
     // Check to see if the VN is in range
     if ( vn >= req_vns ) return false;
     req->vn = vn;
@@ -506,7 +506,7 @@ SST::Interfaces::SimpleNetwork::Request* LinkControl::recv(int vn) {
     SimTime_t nlat = getCurrentSimTimeNano() - event->getNetworkInjectionTime();
     if ( event->getType() == BaseRtrEvent::PACKET ) //this line is added by ziyue, only count if it is a payload, otherwise it will be seg.fault.
         recv_bit_count->addData(event->getSizeInBits()); 
-    packet_latency->addData(plat);
+    // packet_latency->addData(plat);
     network_latency->addData(nlat);
     //==================
 

@@ -73,7 +73,7 @@ public:
     )
 
     SST_ELI_DOCUMENT_STATISTICS(
-        { "packet_latency",     "Histogram of latencies for received packets", "latency", 1},
+        // { "packet_latency",     "Histogram of latencies for received packets", "latency", 1},
         { "network_latency",     "Histogram of latencies for received packets", "latency", 1}, //added by ziyue
         { "send_bit_count",     "Count number of bits sent on link", "bits", 1},
         { "output_port_stalls", "Time output port is stalled (in units of core timebase)", "time in stalls", 1},
@@ -231,6 +231,7 @@ public:
     // Returns true if there is space in the output buffer and false
     // otherwise.
     bool send(SST::Interfaces::SimpleNetwork::Request* req, int vn);
+    bool send(SST::Interfaces::SimpleNetwork::Request* req, int vn, SimTime_t c_time);//added by ziyue, for network-independent source queue injection
 
     // Returns true if there is space in the output buffer and false
     // otherwise.
