@@ -504,10 +504,11 @@ SST::Interfaces::SimpleNetwork::Request* LinkControl::recv(int vn) {
     //added by ziyue: set arrival time
     SimTime_t plat = getCurrentSimTimeNano() - event->getInjectionTime();
     SimTime_t nlat = getCurrentSimTimeNano() - event->getNetworkInjectionTime();
-    if ( event->getType() == BaseRtrEvent::PACKET ) //this line is added by ziyue, only count if it is a payload, otherwise it will be seg.fault.
+    if ( event->getType() == BaseRtrEvent::PACKET ){ //this line is added by ziyue, only count if it is a payload, otherwise it will be seg.fault.
         recv_bit_count->addData(event->getSizeInBits()); 
-    // packet_latency->addData(plat);
-    network_latency->addData(nlat);
+        // packet_latency->addData(plat);
+        network_latency->addData(nlat);
+    }
     //==================
 
     SST::Interfaces::SimpleNetwork::Request* ret = event->takeRequest();
