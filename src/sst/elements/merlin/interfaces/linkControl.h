@@ -207,7 +207,7 @@ private:
 
     // PacketStats stats;
     // Statistics
-    Statistic<uint64_t>* packet_latency;
+    // Statistic<uint64_t>* packet_latency;
     Statistic<uint64_t>* network_latency; //added by ziyue
     Statistic<uint64_t>* send_bit_count;
     Statistic<uint64_t>* output_port_stalls;
@@ -231,7 +231,6 @@ public:
     // Returns true if there is space in the output buffer and false
     // otherwise.
     bool send(SST::Interfaces::SimpleNetwork::Request* req, int vn);
-    bool send(SST::Interfaces::SimpleNetwork::Request* req, int vn, SimTime_t c_time);//added by ziyue, for network-independent source queue injection
 
     // Returns true if there is space in the output buffer and false
     // otherwise.

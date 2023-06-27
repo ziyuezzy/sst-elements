@@ -143,7 +143,7 @@ LinkControl::LinkControl(ComponentId_t cid, Params &params, int vns) :
 
 
     // Register statistics
-    // packet_latency = registerStatistic<uint64_t>("packet_latency"); //TODO: add network-independent source queue for plat
+    // packet_latency = registerStatistic<uint64_t>("packet_latency");
     network_latency = registerStatistic<uint64_t>("network_latency");//added by ziyue
     send_bit_count = registerStatistic<uint64_t>("send_bit_count");
     output_port_stalls = registerStatistic<uint64_t>("output_port_stalls");
@@ -502,7 +502,7 @@ SST::Interfaces::SimpleNetwork::Request* LinkControl::recv(int vn) {
     }
 
     //added by ziyue: set arrival time
-    SimTime_t plat = getCurrentSimTimeNano() - event->getInjectionTime();
+    // SimTime_t plat = getCurrentSimTimeNano() - event->getInjectionTime();
     SimTime_t nlat = getCurrentSimTimeNano() - event->getNetworkInjectionTime();
     if ( event->getType() == BaseRtrEvent::PACKET ){ //this line is added by ziyue, only count if it is a payload, otherwise it will be seg.fault.
         recv_bit_count->addData(event->getSizeInBits()); 

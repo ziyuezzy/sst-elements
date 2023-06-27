@@ -345,18 +345,9 @@ OfferedLoad::end_handler(Event* ev) { //TODO: modify this such that the draining
         complete_event[generation]->backup = current_time - next_time; //TODO: what is this backup thing? 
     }
 
-    // See if we are done //this has been editted by ziyue: I reckon that this was not correct
-    // /*============original code:=================
     if ( complete_event.size() == offered_load.size() ) {
         primaryComponentOKToEndSim();
     }
-    // =============================================*/
-    // //the following lines are written by ziyue
-    // if ( complete_event.size() == offered_load.size()+1 ) {
-    //     assert(complete_event.size() <= offered_load.size()+1);
-    //     primaryComponentOKToEndSim();
-    // }
-    // //=======================================
     else {
 
         // Need to set things up for the next iteration
