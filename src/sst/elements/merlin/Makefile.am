@@ -46,6 +46,8 @@ libmerlin_la_SOURCES = \
 	topology/fattree.cc \
 	topology/dragonfly.h \
 	topology/dragonfly.cc \
+	topology/from_graph.h \
+	topology/from_graph.cc \
 	topology/singlerouter.h \
 	topology/singlerouter.cc \
 	topology/hyperx.h \
@@ -83,6 +85,7 @@ libmerlin_la_SOURCES = \
 	interfaces/pymerlin-interface.py \
 	target_generator/pymerlin-targetgen.py \
 	topology/pymerlin-topo-dragonfly.py \
+	topology/pymerlin-topo-from_graph.py \
 	topology/pymerlin-topo-hyperx.py \
 	topology/pymerlin-topo-fattree.py \
 	topology/pymerlin-topo-mesh.py
@@ -127,6 +130,7 @@ BUILT_SOURCES = \
 	interfaces/pymerlin-interface.inc \
 	target_generator/pymerlin-targetgen.inc \
 	topology/pymerlin-topo-dragonfly.inc \
+	topology/pymerlin-topo-from_graph.inc \
 	topology/pymerlin-topo-hyperx.inc \
 	topology/pymerlin-topo-fattree.inc \
 	topology/pymerlin-topo-mesh.inc
