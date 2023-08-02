@@ -58,9 +58,9 @@ topo_from_graph::topo_from_graph(ComponentId_t cid, Params& params, int num_port
         }
         curr_vc += vns[i].num_vcs;
     }  
-    std::string csv_file_path = params.find<std::string>("csv_files_path", 0);
-    std::string RT_path=csv_file_path.append("/RT.csv");
-    std::string CON_path=csv_file_path.append("/CON.csv");
+    std::string csv_file_path = params.find<std::string>("csv_files_path", ".");
+    std::string RT_path=csv_file_path + "/RT.csv";
+    std::string CON_path=csv_file_path + "/CON.csv";
 
     std::ifstream CON_csv(CON_path);
     std::ifstream RT_csv(RT_path);
@@ -69,8 +69,8 @@ topo_from_graph::topo_from_graph(ComponentId_t cid, Params& params, int num_port
     // Construct routing tables
     bool in_the_zoon=false;
     std::string line;
-    std::getline(CON_csv, line); // skip header line
-    while (std::getline(CON_csv, line))
+    std::getline(RT_csv, line); // skip header line
+    while (std::getline(RT_csv, line))
     {
         std::stringstream ss(line);
         std::string sourceStr;
@@ -90,22 +90,26 @@ topo_from_graph::topo_from_graph(ComponentId_t cid, Params& params, int num_port
             std::getline(ss, ValueStr);
             int dest_id = std::stoi(destinationStr);
             std::stringstream path_string(ValueStr);
-            int* path_to_append = new int[max_path_length];
+            std::vector<int> path_to_append;
+            path_to_append.clear();
             std::getline(path_string, nodeStr, ' ');
             int next_node = std::stoi(nodeStr);
-            assert(next_node==router_id);// the first node should be itself
-            for (size_t i = 0; i < max_path_length; i++){
+            assert(next_node==router_id);
+            path_to_append.push_back(next_node);
+            for (size_t i = 0; i < max_path_length; i++){//TODO: don't need max length anymore
                 if(std::getline(path_string, nodeStr, ' ')){
-                    int next_node = std::stoi(nodeStr);
-                    path_to_append[i]=next_node;
+                    next_node = std::stoi(nodeStr);
+                    assert(next_node>=0 && next_node<num_routers);
+                    path_to_append.push_back(next_node);
                 }else{
-                    int next_node=-1;
-                    path_to_append[i]=next_node;
+                    next_node=-1;
+                    path_to_append.push_back(next_node);
                 }
             }
             routing_table[dest_id].second.push_back(path_to_append);                        
         }
     }
+    assert(routing_table.size()==num_routers-1);
 
     // Construct connectivity map (key is dest id, value is port id)
     in_the_zoon=false;
@@ -134,12 +138,23 @@ topo_from_graph::topo_from_graph(ComponentId_t cid, Params& params, int num_port
         }
     }
     
-    
+    for (size_t i = 0; i < num_routers; i++)
+        if(i!=router_id)
+            routing_table[i].first=0;
 
 }
 
 topo_from_graph::~topo_from_graph(){
     delete[] vns;
+
+    // for (auto& entry : routing_table) {
+    //     for (int* path : entry.second.second) {
+    //         delete[] path;
+    //     }
+    //     entry.second.second.clear();
+    // } 
+    routing_table.clear();
+
 }
 
 void topo_from_graph::route_packet(int port, int vc, internal_router_event* ev){
@@ -167,19 +182,26 @@ int topo_from_graph::get_dest_local_port(int dest_id) const
 void topo_from_graph::route_nonadaptive(int port, int vc, internal_router_event* ev, int dest_router){
     topo_from_graph_event *fg_ev = static_cast<topo_from_graph_event*>(ev);
     if(fg_ev->hops==0){
-        assert(fg_ev->path == 0);
+        assert(fg_ev->path.empty());
         // Determine the path for this packet
-        fg_ev->path=routing_table[dest_router].second[routing_table[dest_router].first];
+        // fg_ev->path=routing_table[dest_router].second[routing_table[dest_router].first];
+        for (size_t i = 0; i <= max_path_length; i++)
+        {
+            fg_ev->path.push_back(routing_table[dest_router].second[routing_table[dest_router].first][i]);
+        }
+            
         routing_table[dest_router].first=(routing_table[dest_router].first+1)%routing_table[dest_router].second.size(); //update rr counter
     }else{
-        assert(fg_ev->path != 0);
+        assert(!fg_ev->path.empty());
         //nothing to do
     }
     fg_ev->hops++;
+    assert(fg_ev->hops <= max_path_length);
+    
     // Find the correct port
     int next_router = fg_ev->path[fg_ev->hops];
     assert(next_router!=-1); //the packet should have already reached the destination
-    assert(connectivity.count(next_router));
+    assert(next_router>=0 && next_router<=num_routers && next_router!= router_id && connectivity.count(next_router));
     int p=connectivity[next_router];
     fg_ev->setNextPort(p);
     fg_ev->setVC(vc++);        
@@ -215,7 +237,7 @@ void topo_from_graph::routeUntimedData(int port, internal_router_event* ev, std:
         //     /* code */
         // }
     }else{
-        route_nonadaptive(port, 0, ev, get_dest_router(ev->getDest()));
+        route_packet(port, 0, ev);
         outPorts.push_back(ev->getNextPort());
     }
 }

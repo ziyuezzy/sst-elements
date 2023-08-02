@@ -61,7 +61,7 @@ public:
     };
 
     // A dictionary for routing table
-    std::map<int, std::pair<int, std::vector<int*>>> routing_table;//key is destination router id, value is a round-robin counter and a list of all possible paths.
+    std::map<int, std::pair<int, std::vector<std::vector<int>>>> routing_table;//key is destination router id, value is a round-robin counter and a list of all possible paths.
     // A dictionary for port connectivity (which port is connected to which router)
     std::map<int, int> connectivity; //key is destination router id, value is port id. However this assumes that there is no parallel link.
 
@@ -118,14 +118,15 @@ class topo_from_graph_event : public internal_router_event {
 public:
     static int MAX_PATH_LENGTH;
     int dest; // destination EP id
-    int* path; // determined path from the routing table for the packet
+    std::vector<int> path; // determined path from the routing table for the packet
     int hops; // keep counts for the number of hops that are already done
     // TODO: QoS (to guarantee on-time pre-fetching)
 
     topo_from_graph_event() {}
-    topo_from_graph_event(int dest) {	dest = dest; hops=0; path={ }; }
+    topo_from_graph_event(int dest) {	dest = dest; hops=0; path.clear(); }
     virtual ~topo_from_graph_event() { 
-        delete[] path; 
+        path.clear();
+        hops=0;
         }
     virtual internal_router_event* clone(void) override
     {
@@ -136,12 +137,28 @@ public:
         internal_router_event::serialize_order(ser);
         ser & dest;
         ser & hops;
-        if ( ser.mode() == SST::Core::Serialization::serializer::UNPACK ) {
-            path = new int[MAX_PATH_LENGTH];
+        // if ( ser.mode() == SST::Core::Serialization::serializer::UNPACK ) {
+        //     path = new int[MAX_PATH_LENGTH];
+        // }
+        // for ( int i = 0 ; i < MAX_PATH_LENGTH ; i++ ) {
+        //     ser & path[i];
+        // }
+        if (ser.mode() == SST::Core::Serialization::serializer::UNPACK) {
+            // If you are deserializing (unpacking), first deserialize the size of the array.
+            size_t arraySize;
+            ser & arraySize;
+            path.resize(arraySize);
+        } else {
+            // If you are serializing (packing), serialize the size of the array.
+            size_t arraySize = path.size();
+            ser & arraySize;
         }
-        for ( int i = 0 ; i < MAX_PATH_LENGTH ; i++ ) {
+
+        // Now serialize or deserialize the elements of the array.
+        for (int i = 0; i < path.size(); i++) {
             ser & path[i];
         }
+        // ser & (*path);
     }
 
 protected:
@@ -150,6 +167,7 @@ private:
     ImplementSerializable(SST::Merlin::topo_from_graph_event)
 
 };
+int topo_from_graph_event::MAX_PATH_LENGTH; 
 
 
 }
