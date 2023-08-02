@@ -11,7 +11,7 @@ Modifications by ziyue:
 
 2023 June:
 Implemented Graph-based topologies, called 'from_graph' topology.
-This new topology can import graph structure (edge list) from file (python pickled file for now) and construct the network. Another necessary file to import is the path dictionary, which stores the possible paths between any two vertices in the embedded graph. An example repository to generate these imported files is here: 
+This new topology can import graph structure (edge list) from file (python pickled file for now) and construct the network. Another necessary file to import is the path dictionary, which stores the possible paths between any two vertices in the embedded graph. An example repository to generate these imported files is here: https://github.ugent.be/ziyzhang/topology-research (TODO: public repo instead of ugent github?)
 
 Theoratically the 'from_graph' topology can simulate any possible network topology, however the overhead of this method is mainly the computation, disk and RAM usage for the path dictionary. This method is suitable for simulating networks that do not have specific routing rules such as Jellyfish, or the specific routing rules are difficult to define such as Slimfly, Polarfly, Equality network, etc. For simulating traditional topologies such as Torus, Fat-tree, dragonfly whose routing rules are clear and already implemented, the corresponding original Merlin topology classes are recommanded. 
 
