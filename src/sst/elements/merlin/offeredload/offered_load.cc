@@ -325,9 +325,12 @@ void
 OfferedLoad::progress_messages(SimTime_t current_time) {
     while ( (next_time <= current_time) && link_if->spaceToSend(0,packet_size) ) {
         offered_load_event* ev = new offered_load_event(next_time);
-        SimpleNetwork::Request* req = new SimpleNetwork::Request(packetDestGen->getNextValue(), id, packet_size, true, true, ev);
-        link_if->send(req,0);
-
+        int dest=packetDestGen->getNextValue();
+        if(dest!=-1){ //adding this for the bit-reversal traffic pattern
+            assert(dest>=0 && dest <num_peers);
+            SimpleNetwork::Request* req = new SimpleNetwork::Request(dest, id, packet_size, true, true, ev);
+            link_if->send(req,0);
+        }
         next_time += send_interval;
     }
 }
