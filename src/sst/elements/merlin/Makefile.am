@@ -26,6 +26,7 @@ libmerlin_la_SOURCES = \
 	target_generator/target_generator.h \
 	target_generator/target_generator.cc \
 	target_generator/bit_complement.h \
+	target_generator/bit_reversal.h \
 	target_generator/shift.h \
 	target_generator/uniform.h \
 	test/nic.h \
