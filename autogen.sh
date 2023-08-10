@@ -54,6 +54,11 @@ added_m4_list=
 # Look at the the directories in the elements subdir
 for file in `ls $BASE_DIR/src/sst/elements`; do
 
+    #added by ziyue: only build Merlin
+    if [[ "$file" != *"merlin"* ]]; then
+        continue
+    fi
+    
     # Make sure file is actually a dir
 	if [ -d "$BASE_DIR/src/sst/elements/$file" ]; then
 	    
