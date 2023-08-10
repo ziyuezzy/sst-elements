@@ -7,6 +7,7 @@ import sst
 from sst.merlin.base import *
 import pickle
 import csv
+import os
 
 class topoFromGraph(Topology):
 
@@ -74,6 +75,9 @@ class topoFromGraph(Topology):
         assert(min(router_next_port)==self.graph_degree) #If it is a regular graph, otherwise not implemented
         #TODO: if the degree of a certain vertex is not exactly the maximal? (GDBG and polarfly)
         del edgelist
+        #create directory
+        if not os.path.exists(self.csv_files_path):
+            os.mkdir(self.csv_files_path)
         #write csv file to store connectivity 
         with open(f'{self.csv_files_path}/CON.csv', mode='w') as csv_CON:
             csv_writer = csv.writer(csv_CON, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
