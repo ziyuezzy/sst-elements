@@ -195,6 +195,8 @@ void topo_from_graph::route_nonadaptive(int port, int vc, internal_router_event*
         assert(!fg_ev->path.empty());
         //nothing to do
     }
+    
+    fg_ev->setVC(fg_ev->hops);  
     fg_ev->hops++;
     assert(fg_ev->hops <= max_path_length);
     
@@ -203,8 +205,7 @@ void topo_from_graph::route_nonadaptive(int port, int vc, internal_router_event*
     assert(next_router!=-1); //the packet should have already reached the destination
     assert(next_router>=0 && next_router<=num_routers && next_router!= router_id && connectivity.count(next_router));
     int p=connectivity[next_router];
-    fg_ev->setNextPort(p);
-    fg_ev->setVC(vc++);        
+    fg_ev->setNextPort(p);    
     
 }
 
