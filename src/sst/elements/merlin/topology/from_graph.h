@@ -24,6 +24,7 @@
 #include <sst/core/event.h>
 #include <sst/core/link.h>
 #include <sst/core/params.h>
+#include <sst/core/rng/rng.h>
 
 #include "sst/elements/merlin/router.h"
 
@@ -71,12 +72,13 @@ public:
     int num_local_ports;
     int local_port_start;
     int max_path_length;
-    // TODO: for adaptive routing
-    // int const* output_credits;
-    // int const* output_queue_lengths;
-    // virtual void setOutputBufferCreditArray(int const* array, int vcs);
-    // virtual void setOutputQueueLengthsArray(int const* array, int vcs);
-    // int num_vcs;
+    // for adaptive routing
+    int const* output_credits;
+    int const* output_queue_lengths;
+    virtual void setOutputBufferCreditArray(int const* array, int vcs);
+    virtual void setOutputQueueLengthsArray(int const* array, int vcs);
+    int num_vcs;
+    RNG::Random* rng;
 
     int num_vns;
 
@@ -110,7 +112,7 @@ public:
     int get_dest_router(int dest_id) const;
     int get_dest_local_port(int dest_id) const;
     void route_nonadaptive(int port, int vc, internal_router_event* ev, int dest_router);
-    void route_adaptive(int port, int vc, internal_router_event* ev);
+    void route_adaptive(int port, int vc, internal_router_event* ev, int dest_router);
 };
 
 

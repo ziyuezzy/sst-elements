@@ -6,6 +6,7 @@
 #include <fstream>
 #include <algorithm>
 #include <stdlib.h>
+#include "sst/core/rng/xorshift.h"
 
 using namespace SST::Merlin;
 
@@ -75,6 +76,12 @@ topo_from_graph::topo_from_graph(ComponentId_t cid, Params& params, int num_port
         std::stringstream ss(line);
         std::string sourceStr;
         std::getline(ss, sourceStr, ',');
+        if (!std::isdigit(sourceStr[0])){
+            // should be the last line
+            assert(!std::getline(RT_csv, line));
+            break;
+        }
+        
         int src_id=std::stoi(sourceStr);
         if(src_id==router_id && !in_the_zoon) // enters the correct region for this router
             in_the_zoon=true;
@@ -96,14 +103,14 @@ topo_from_graph::topo_from_graph(ComponentId_t cid, Params& params, int num_port
             int next_node = std::stoi(nodeStr);
             assert(next_node==router_id);
             path_to_append.push_back(next_node);
-            for (size_t i = 0; i < max_path_length; i++){//TODO: don't need max length anymore
+            for (size_t i = 0; i < max_path_length; i++){
                 if(std::getline(path_string, nodeStr, ' ')){
                     next_node = std::stoi(nodeStr);
                     assert(next_node>=0 && next_node<num_routers);
                     path_to_append.push_back(next_node);
                 }else{
-                    next_node=-1;
-                    path_to_append.push_back(next_node);
+                    // next_node=-1;
+                    // path_to_append.push_back(next_node);
                 }
             }
             routing_table[dest_id].second.push_back(path_to_append);                        
@@ -142,6 +149,7 @@ topo_from_graph::topo_from_graph(ComponentId_t cid, Params& params, int num_port
         if(i!=router_id)
             routing_table[i].first=0;
 
+    rng = new RNG::XORShiftRNG(rtr_id+1);
 }
 
 topo_from_graph::~topo_from_graph(){
@@ -164,7 +172,7 @@ void topo_from_graph::route_packet(int port, int vc, internal_router_event* ev){
     } else {
         int vn = ev->getVN();
         if ( vns[vn].algorithm == nonadaptive_multipath ) return route_nonadaptive(port,vc,ev,dest_router);
-        else if ( vns[vn].algorithm == adaptive_multipath ) return route_adaptive(port,vc,ev);
+        else if ( vns[vn].algorithm == adaptive_multipath ) return route_adaptive(port,vc,ev,dest_router);
         else fatal(CALL_INFO_LONG,1,"ERROR: Unknown routing algorithm encountered");
     }
 }
@@ -185,10 +193,8 @@ void topo_from_graph::route_nonadaptive(int port, int vc, internal_router_event*
         assert(fg_ev->path.empty());
         // Determine the path for this packet
         // fg_ev->path=routing_table[dest_router].second[routing_table[dest_router].first];
-        for (size_t i = 0; i <= max_path_length; i++)
-        {
-            fg_ev->path.push_back(routing_table[dest_router].second[routing_table[dest_router].first][i]);
-        }
+        std::vector<int> temp_path=routing_table[dest_router].second[routing_table[dest_router].first];
+        for (auto i: temp_path) fg_ev->path.push_back(i);
             
         routing_table[dest_router].first=(routing_table[dest_router].first+1)%routing_table[dest_router].second.size(); //update rr counter
     }else{
@@ -201,17 +207,53 @@ void topo_from_graph::route_nonadaptive(int port, int vc, internal_router_event*
     assert(fg_ev->hops <= max_path_length);
     
     // Find the correct port
+    assert( fg_ev->path.size() > fg_ev->hops && "the packet should have already reached the destination");
     int next_router = fg_ev->path[fg_ev->hops];
-    assert(next_router!=-1); //the packet should have already reached the destination
+    
     assert(next_router>=0 && next_router<=num_routers && next_router!= router_id && connectivity.count(next_router));
     int p=connectivity[next_router];
     fg_ev->setNextPort(p);    
     
 }
 
-void topo_from_graph::route_adaptive(int port, int vc, internal_router_event* ev){
-        fatal(CALL_INFO_LONG,1,"ERROR: not yet implemented");
+void topo_from_graph::route_adaptive(int port, int vc, internal_router_event* ev, int dest_router){
+// (for now, do not support the path to exceed 'max_path_length' in the imported routing table, but //TODO: this may be able to change)
+    // weight all paths (that do not exceeds max_path_length) in the routing table
+    // weight = local queue lengths at the corresponding vc
+    int min_weight = std::numeric_limits<int>::max();
+    std::vector<std::pair<int,std::vector<int>> > min_routes;  //pair < port id, path vector >
+    topo_from_graph_event *fg_ev = static_cast<topo_from_graph_event*>(ev);
+    for (std::vector<int> path : routing_table[dest_router].second){
+        if(fg_ev->hops + path.size()-1 > max_path_length){// if the accumulated length exceeds max_path_length, ignore
+            continue;
+        }else{//otherwise, calculate weight
+            int next_router=path[1];
+            int next_port=connectivity[next_router];
+            int weight = output_queue_lengths[next_port * num_vcs + vc];
+            if ( weight == min_weight){
+                min_routes.push_back(std::make_pair(next_port, path));
+            }else if(weight < min_weight){
+                min_weight=weight;
+                min_routes.clear();
+                min_routes.push_back(std::make_pair(next_port, path));
+            }
+        }
+    }
+    assert(!min_routes.empty());
+    std::pair<int,std::vector<int>> & route = min_routes[rng->generateNextUInt32() % min_routes.size()]; //TODO: what is wrong with RNG?
+    fg_ev->setNextPort(route.first);
+
+    fg_ev->path.clear();
+    for (auto i: route.second) fg_ev->path.push_back(i); // Just directly replace the path here. If it is not good?
+
+    fg_ev->setVC(fg_ev->hops);  
+    fg_ev->hops++;
+    assert(fg_ev->hops <= max_path_length);
+        
+        // fatal(CALL_INFO_LONG,1,"ERROR: not yet implemented");
 }
+
+//TODO: VALIANT routing?
 
 internal_router_event* topo_from_graph::process_input(RtrEvent* ev){
     int vn = ev->getRouteVN();
@@ -224,7 +266,7 @@ internal_router_event* topo_from_graph::process_input(RtrEvent* ev){
 internal_router_event* topo_from_graph::process_UntimedData_input(RtrEvent* ev){
     topo_from_graph_event* fg_ev = new topo_from_graph_event();
     fg_ev->setEncapsulatedEvent(ev);
-    fg_ev->dest=ev->getDest(); //TODO: delete 'fg_ev->dest', since the dest can be obtained from ->getDest()?
+    fg_ev->dest=ev->getDest();
 
     return fg_ev;
 }
@@ -259,4 +301,16 @@ int topo_from_graph::getEndpointID(int port)
     return (router_id * num_local_ports) + (port - local_port_start);
 }
 
+void
+topo_from_graph::setOutputBufferCreditArray(int const* array, int vcs)
+{
+    output_credits = array;
+    num_vcs = vcs;
+}
 
+void
+topo_from_graph::setOutputQueueLengthsArray(int const* array, int vcs)
+{
+    output_queue_lengths = array;
+    num_vcs = vcs;
+}
