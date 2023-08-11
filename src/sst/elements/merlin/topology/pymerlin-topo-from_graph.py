@@ -53,50 +53,90 @@ class topoFromGraph(Topology):
                     # print(f"router {r}'s port{port_id} is connected to EP {nodeID}'s port {port_name}")
                     port_id+=1
             assert(port_id==router_radix)
-        
-        #read picked graph structure from file
-        _CON=[]
-        edgelist=pickle.load(open(self.edgelist_file, 'rb'))
-        edgelist.sort() # sort the edge list, for the csv file to be more clean
-        router_next_port=[0]*self.graph_num_vertices
-        #interconnect routers
-        for edge in edgelist:
-            source=edge[0]
-            dest=edge[1]
-            _CON.append([source, dest, router_next_port[source]])
-            _CON.append([dest, source, router_next_port[dest]])
-            link = sst.Link("link_%d_%d"%(source, dest))
-            routers[source].addLink(link, "port%d"%router_next_port[source], self.link_latency)
-            router_next_port[source]+=1
-            routers[dest].addLink(link, "port%d"%router_next_port[dest], self.link_latency)
-            router_next_port[dest]+=1
-        _CON.sort()
-        assert(max(router_next_port)==self.graph_degree)
-        assert(min(router_next_port)==self.graph_degree) #If it is a regular graph, otherwise not implemented
-        #TODO: if the degree of a certain vertex is not exactly the maximal? (GDBG and polarfly)
-        del edgelist
-        #create directory
-        if not os.path.exists(self.csv_files_path):
+
+        #check directory
+        if os.path.exists(self.csv_files_path):
+            # if directory already exists, construct network and passdown 'max_path_length' (to save execution time?)
+            #read picked graph structure from file
+            _CON=[]
+            edgelist=pickle.load(open(self.edgelist_file, 'rb'))
+            edgelist.sort() # sort the edge list, for the csv file to be more clean
+            router_next_port=[0]*self.graph_num_vertices
+            #interconnect routers
+            for edge in edgelist:
+                source=edge[0]
+                dest=edge[1]
+                _CON.append([source, dest, router_next_port[source]])
+                _CON.append([dest, source, router_next_port[dest]])
+                link = sst.Link("link_%d_%d"%(source, dest))
+                routers[source].addLink(link, "port%d"%router_next_port[source], self.link_latency)
+                router_next_port[source]+=1
+                routers[dest].addLink(link, "port%d"%router_next_port[dest], self.link_latency)
+                router_next_port[dest]+=1
+            _CON.sort()
+            assert(max(router_next_port)==self.graph_degree)
+            assert(min(router_next_port)==self.graph_degree) #If it is a regular graph, otherwise not implemented
+            #TODO: if the degree of a certain vertex is not exactly the maximal? (GDBG and polarfly)
+            del edgelist
+
+            def get_last_number_from_csv(filename):
+                with open(filename, "rb") as file:
+                    file.seek(-2, 2)  # Move to the second-to-last character
+                    while file.read(1) != b'\n':  # Move backwards until a newline character is found
+                        file.seek(-2, 1)
+                    last_line = file.readline().decode().strip()  # Read the last line and decode from bytes
+                _, number_str = last_line.split(",")  # Split the line into parts
+                number = int(number_str.strip())  # Convert the number string to an integer
+                return number
+            # get max_path_length 
+            self.max_path_length=get_last_number_from_csv(f"{self.csv_files_path}/RT.csv")
+
+        else:
+            #Otherwise continue the complete pass-down process
             os.mkdir(self.csv_files_path)
-        #write csv file to store connectivity 
-        with open(f'{self.csv_files_path}/CON.csv', mode='w') as csv_CON:
-            csv_writer = csv.writer(csv_CON, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-            csv_writer.writerow(["source", "dest", "port"])
-            for row in _CON:
-                csv_writer.writerow([row[0], row[1], row[2]])
 
-        #write csv file to store routing table 
-        self.max_path_length=0
-        with open(f'{self.csv_files_path}/RT.csv', mode='w') as csv_RT:
-            csv_writer = csv.writer(csv_RT, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-            csv_writer.writerow(["source", "dest", "path"])
+            #read picked graph structure from file
+            _CON=[]
+            edgelist=pickle.load(open(self.edgelist_file, 'rb'))
+            edgelist.sort() # sort the edge list, for the csv file to be more clean
+            router_next_port=[0]*self.graph_num_vertices
+            #interconnect routers
+            for edge in edgelist:
+                source=edge[0]
+                dest=edge[1]
+                _CON.append([source, dest, router_next_port[source]])
+                _CON.append([dest, source, router_next_port[dest]])
+                link = sst.Link("link_%d_%d"%(source, dest))
+                routers[source].addLink(link, "port%d"%router_next_port[source], self.link_latency)
+                router_next_port[source]+=1
+                routers[dest].addLink(link, "port%d"%router_next_port[dest], self.link_latency)
+                router_next_port[dest]+=1
+            _CON.sort()
+            assert(max(router_next_port)==self.graph_degree)
+            assert(min(router_next_port)==self.graph_degree) #If it is a regular graph, otherwise not implemented
+            #TODO: if the degree of a certain vertex is not exactly the maximal? (GDBG and polarfly)
+            del edgelist
+            #write csv file to store connectivity 
+            with open(f'{self.csv_files_path}/CON.csv', mode='w') as csv_CON:
+                csv_writer = csv.writer(csv_CON, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+                csv_writer.writerow(["source", "dest", "port"])
+                for row in _CON:
+                    csv_writer.writerow([row[0], row[1], row[2]])
 
-            pathdict=dict(sorted(pickle.load(open(self.pathdict_file, 'rb')).items()))
-            for (source, destination), paths in pathdict.items():
-                for path in paths:
-                    csv_writer.writerow([source, destination, ' '.join(str(v) for v in path)])
-                    if len(path)-1 > self.max_path_length:
-                        self.max_path_length = len(path)-1
+            #write csv file to store routing table 
+            self.max_path_length=0
+            with open(f'{self.csv_files_path}/RT.csv', mode='w') as csv_RT:
+                csv_writer = csv.writer(csv_RT, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+                csv_writer.writerow(["source", "dest", "path"])
+
+                pathdict=dict(sorted(pickle.load(open(self.pathdict_file, 'rb')).items()))
+                for (source, destination), paths in pathdict.items():
+                    for path in paths:
+                        csv_writer.writerow([source, destination, ' '.join(str(v) for v in path)])
+                        if len(path)-1 > self.max_path_length:
+                            self.max_path_length = len(path)-1
+                            
+                csv_writer.writerow(["max_path_length", self.max_path_length])
 
         
         for r in range(self.graph_num_vertices):
