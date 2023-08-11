@@ -6,6 +6,7 @@
 #include <fstream>
 #include <algorithm>
 #include <stdlib.h>
+#include "sst/core/rng/xorshift.h"
 
 using namespace SST::Merlin;
 
@@ -148,6 +149,7 @@ topo_from_graph::topo_from_graph(ComponentId_t cid, Params& params, int num_port
         if(i!=router_id)
             routing_table[i].first=0;
 
+    rng = new RNG::XORShiftRNG(rtr_id+1);
 }
 
 topo_from_graph::~topo_from_graph(){
