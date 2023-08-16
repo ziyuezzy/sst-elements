@@ -58,7 +58,9 @@ public:
 
     enum RouteAlgo {
         nonadaptive_multipath,
-        adaptive_multipath
+        adaptive_multipath,
+        valiant,
+        ugal //UGAL-L, because UGAL-G is difficult to implement in Merlin (?)
     };
 
     // A dictionary for routing table
@@ -72,6 +74,7 @@ public:
     int num_local_ports;
     int local_port_start;
     int max_path_length;
+    int ugal_val_options;
     // for adaptive routing
     int const* output_credits;
     int const* output_queue_lengths;
@@ -112,6 +115,8 @@ public:
     int get_dest_router(int dest_id) const;
     int get_dest_local_port(int dest_id) const;
     void route_nonadaptive(int port, int vc, internal_router_event* ev, int dest_router);
+    void route_valiant(int port, int vc, internal_router_event* ev, int dest_router);
+    void route_ugal(int port, int vc, internal_router_event* ev, int dest_router, int num_VAL);
     void route_adaptive(int port, int vc, internal_router_event* ev, int dest_router);
 };
 
@@ -124,8 +129,21 @@ public:
     int hops; // keep counts for the number of hops that are already done
     // TODO: QoS (to guarantee on-time pre-fetching)
 
+    int valiant_router; 
+    // for valiant routing. -2 means do not do valiant routing; 
+    // -1 or '0 or positive number' means do valiant routing:
+    // '0 or psitive number' means still in the first segment of valiant path,
+    // -1 means the packet is in the last segment of the valiant path.
+    int valiant_offset; // offset of the valiant path in the overall path
+
     topo_from_graph_event() {}
-    topo_from_graph_event(int dest) {	dest = dest; hops=0; path.clear(); }
+    topo_from_graph_event(int dest) {	
+        dest = dest; 
+        hops=0; 
+        path.clear(); 
+        valiant_router=-2; 
+        valiant_offset=0;
+        }
     virtual ~topo_from_graph_event() { 
         path.clear();
         hops=0;

@@ -7,9 +7,9 @@ AM_CPPFLAGS += \
 	$(MPI_CPPFLAGS) \
 	$(PYTHON_CPPFLAGS)
 
-CPPFLAGS += -O0
+# CPPFLAGS += -O0
 
-CXXFLAGS += -O0
+# CXXFLAGS += -O0
 
 compdir = $(pkglibdir)
 comp_LTLIBRARIES = libmerlin.la

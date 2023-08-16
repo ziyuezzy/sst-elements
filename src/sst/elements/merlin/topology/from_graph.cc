@@ -28,6 +28,7 @@ topo_from_graph::topo_from_graph(ComponentId_t cid, Params& params, int num_port
     topo_from_graph_event::MAX_PATH_LENGTH = max_path_length;
     local_port_start = graph_degree; //local ports are put at last
 
+    ugal_val_options = params.find<int>("ugal_val_options", 4);
     vns = new vn_info[num_vns];
     std::vector<std::string> vn_route_algos;
     if ( params.is_value_array("algorithm") ) {
@@ -53,6 +54,14 @@ topo_from_graph::topo_from_graph(ComponentId_t cid, Params& params, int num_port
         else if ( !vn_route_algos[i].compare("adaptive") ) {
             vns[i].algorithm = adaptive_multipath;
             vns[i].num_vcs = max_path_length;
+        }
+        else if ( !vn_route_algos[i].compare("valiant") ) {
+            vns[i].algorithm = valiant;
+            vns[i].num_vcs = max_path_length*2;
+        }
+        else if ( !vn_route_algos[i].compare("ugal") ) {
+            vns[i].algorithm = ugal;
+            vns[i].num_vcs = max_path_length*2;
         }
         else {
             fatal(CALL_INFO_LONG,1,"ERROR: Unknown routing algorithm specified: %s\n",vn_route_algos[i].c_str());
@@ -173,6 +182,8 @@ void topo_from_graph::route_packet(int port, int vc, internal_router_event* ev){
         int vn = ev->getVN();
         if ( vns[vn].algorithm == nonadaptive_multipath ) return route_nonadaptive(port,vc,ev,dest_router);
         else if ( vns[vn].algorithm == adaptive_multipath ) return route_adaptive(port,vc,ev,dest_router);
+        else if ( vns[vn].algorithm == valiant ) return route_valiant(port,vc,ev,dest_router);
+        else if ( vns[vn].algorithm == ugal ) return route_ugal(port,vc,ev,dest_router, ugal_val_options);
         else fatal(CALL_INFO_LONG,1,"ERROR: Unknown routing algorithm encountered");
     }
 }
@@ -240,7 +251,7 @@ void topo_from_graph::route_adaptive(int port, int vc, internal_router_event* ev
         }
     }
     assert(!min_routes.empty());
-    std::pair<int,std::vector<int>> & route = min_routes[rng->generateNextUInt32() % min_routes.size()]; //TODO: what is wrong with RNG?
+    std::pair<int,std::vector<int>> & route = min_routes[rng->generateNextUInt32() % min_routes.size()];
     fg_ev->setNextPort(route.first);
 
     fg_ev->path.clear();
@@ -253,7 +264,198 @@ void topo_from_graph::route_adaptive(int port, int vc, internal_router_event* ev
         // fatal(CALL_INFO_LONG,1,"ERROR: not yet implemented");
 }
 
-//TODO: VALIANT routing?
+void topo_from_graph::route_valiant(int port, int vc, internal_router_event* ev, int dest_router){
+    topo_from_graph_event *fg_ev = static_cast<topo_from_graph_event*>(ev);
+
+    // set valiant indicator
+    if (fg_ev->valiant_router==-2){
+        assert(fg_ev->path.empty());
+        // if indicator is -2, set random intermidiate router
+        int intermidiate_router=rng->generateNextUInt64()%num_routers;  
+        while (intermidiate_router==router_id)
+            intermidiate_router=rng->generateNextUInt64()%num_routers;        
+        fg_ev->valiant_router = intermidiate_router;
+
+        std::vector<int> temp_path=routing_table[intermidiate_router].second[routing_table[intermidiate_router].first];
+        for (auto i: temp_path) fg_ev->path.push_back(i); 
+        routing_table[intermidiate_router].first=(routing_table[intermidiate_router].first+1)%routing_table[intermidiate_router].second.size(); //update rr counter    
+    }
+    
+    if (fg_ev->valiant_router>=0)
+    {
+        if(fg_ev->valiant_router==router_id){
+            // if arriving at the intermidiate routing, and indicator is 0 or positive, set it to -1
+            fg_ev->valiant_router=-1;
+
+            // TODO: checks if the second segment of valiant path has overlap with the first segment??
+            // // for (size_t i = 0; i < routing_table[dest_router].second.size(); i++)
+            // // {
+            // //     bool overlap = false;
+            // //     std::vector<int> temp_path=routing_table[dest_router].second[(routing_table[dest_router].first+i)%routing_table[dest_router].second.size()];
+            // //     for (auto u: temp_path){
+            // //         for (auto v: fg_ev->path){
+            // //             if (u==v){
+            // //                 overlap = true;
+            // //                 break;
+            // //             }
+            // //         }
+            // //     }
+            // // }
+            
+            // append path for the next segment, set path offset
+            std::vector<int> temp_path=routing_table[dest_router].second[routing_table[dest_router].first];
+            for (size_t i = 1; i < temp_path.size(); i++)
+                fg_ev->path.push_back(temp_path[i]); // Avoid doubling the id of intermidiate router
+            // for (auto i: temp_path) fg_ev->path.push_back(i); 
+            routing_table[dest_router].first=(routing_table[dest_router].first+1)%routing_table[dest_router].second.size(); //update rr counter    
+            fg_ev->valiant_offset=fg_ev->hops;
+
+        }else{
+            // else forward packet
+            fg_ev->setVC(fg_ev->hops);  
+            fg_ev->hops++;
+            assert(fg_ev->hops <= max_path_length);
+            // Find the correct port
+            assert( fg_ev->path.size() > fg_ev->hops && "the packet should have already reached the destination");
+            int next_router = fg_ev->path[fg_ev->hops];
+            assert(next_router>=0 && next_router<=num_routers && next_router!= router_id && connectivity.count(next_router));
+            int p=connectivity[next_router];
+            fg_ev->setNextPort(p);   
+        }   
+
+    }
+    
+    if(fg_ev->valiant_router==-1){
+        //indicator is -1, meaning the packet has already been routed valiantly
+        fg_ev->setVC(fg_ev->hops);  
+        // fg_ev->setVC(fg_ev->hops - fg_ev->valiant_offset);  
+        fg_ev->hops++;
+        assert(fg_ev->hops <= 2*max_path_length);
+        // Find the correct port
+        assert( fg_ev->path.size() > fg_ev->hops && "the packet should have already reached the destination");
+        int next_router = fg_ev->path[fg_ev->hops];
+        assert(next_router>=0 && next_router<=num_routers && next_router!= router_id && connectivity.count(next_router));
+        int p=connectivity[next_router];
+        fg_ev->setNextPort(p);   
+    }
+}
+
+void topo_from_graph::route_ugal(int port, int vc, internal_router_event* ev, int dest_router, int num_VAL){
+    topo_from_graph_event *fg_ev = static_cast<topo_from_graph_event*>(ev);
+
+    if (fg_ev->hops==0){
+        // need to decide whether or not use valiant route
+        std::map< std::vector<int>, int > possible_paths; // keys are paths, values are costs
+        // generate num_VAL valiant paths, calculate costs
+        // However, we do not know yet the total path length, but only the first segment of valiant path.
+        while (possible_paths.size() < num_VAL)
+        {
+            int intermidiate_router=rng->generateNextUInt64()%num_routers;
+            if (intermidiate_router == router_id)   continue;
+            
+            unsigned int random_number = rng->generateNextUInt32()%routing_table[intermidiate_router].second.size();
+            std::vector<int> temp_path=routing_table[intermidiate_router].second[random_number];
+
+            int next_router=temp_path[1];
+            int next_port=connectivity[next_router];
+            int queue_length = output_queue_lengths[next_port * num_vcs + vc];
+            // assume the second valiant path has max_path_length, in order to calculate the cost
+            possible_paths[temp_path]= (temp_path.size() + max_path_length)*queue_length;
+        }
+        
+        // add shortest paths and calculate costs
+        for (std::vector<int> path : routing_table[dest_router].second){
+            int next_router=path[1];
+            int next_port=connectivity[next_router];
+            possible_paths[path] = path.size()*output_queue_lengths[next_port * num_vcs + vc];
+        }
+        // choose the least-cost path
+        int min_weight = std::numeric_limits<int>::max();
+        std::vector<std::pair<int,std::vector<int>> > min_routes;  //pair < port id, path vector >
+        for(auto p = possible_paths.begin(); p != possible_paths.end(); p++){
+            int weight = p->second;
+            int next_router=p->first[1];
+            int next_port=connectivity[next_router];
+            if ( weight == min_weight){
+                min_routes.push_back(std::make_pair(next_port, p->first));
+            }else if(weight < min_weight){
+                min_weight=weight;
+                min_routes.clear();
+                min_routes.push_back(std::make_pair(next_port, p->first));
+            }
+        }
+        assert(!min_routes.empty());
+        std::pair<int,std::vector<int>> & route = min_routes[rng->generateNextUInt32() % min_routes.size()]; 
+        fg_ev->setNextPort(route.first);
+        for (auto i: route.second) fg_ev->path.push_back(i);
+        if(route.second.back() != dest_router)
+            fg_ev->valiant_router=route.second.back();
+        else
+            fg_ev->valiant_router=-2;
+        fg_ev->setVC(fg_ev->hops);  
+        fg_ev->hops++;
+        // assert(fg_ev->hops <= max_path_length);
+        
+    }else{ // if not the first hop
+        if (fg_ev->valiant_router >= 0){
+            // if in the first segment of valiant path
+            if(router_id==fg_ev->valiant_router){
+                // if it has reached the intermidiate router
+                fg_ev->valiant_router=-1;
+
+                // append path for the next segment, set path offset
+                std::vector<int> temp_path=routing_table[dest_router].second[routing_table[dest_router].first];
+
+                // for (auto i: temp_path) fg_ev->path.push_back(i); 
+                for (size_t i = 1; i < temp_path.size(); i++)
+                    fg_ev->path.push_back(temp_path[i]); // Avoid doubling the id of intermidiate router
+
+                routing_table[dest_router].first=(routing_table[dest_router].first+1)%routing_table[dest_router].second.size(); //update rr counter    //TODO: random?
+                fg_ev->valiant_offset=fg_ev->hops;
+            }else{
+                // else forward packet
+                fg_ev->setVC(fg_ev->hops);  
+                fg_ev->hops++;
+                assert(fg_ev->hops <= max_path_length);
+                // Find the correct port
+                assert( fg_ev->path.size() > fg_ev->hops && "the packet should have already reached the destination");
+                int next_router = fg_ev->path[fg_ev->hops];
+                assert(next_router>=0 && next_router<=num_routers && next_router!= router_id && connectivity.count(next_router));
+                int p=connectivity[next_router];
+                fg_ev->setNextPort(p);   
+            }
+        }
+
+        if(fg_ev->valiant_router==-1){
+                // if in the second segment of valiant path
+                fg_ev->setVC(fg_ev->hops);  
+                // fg_ev->setVC(fg_ev->hops - fg_ev->valiant_offset);  
+                fg_ev->hops++;
+                assert(fg_ev->hops <= 2*max_path_length);
+                // Find the correct port
+                assert( fg_ev->path.size() > fg_ev->hops && "the packet should have already reached the destination");
+                int next_router = fg_ev->path[fg_ev->hops];
+                assert(next_router>=0 && next_router<=num_routers && next_router!= router_id && connectivity.count(next_router));
+                int p=connectivity[next_router];
+                fg_ev->setNextPort(p);   
+        }
+        
+        if(fg_ev->valiant_router==-2){
+            // if it is routed minimally
+            // else forward packet
+            fg_ev->setVC(fg_ev->hops);  
+            fg_ev->hops++;
+            assert(fg_ev->hops <= max_path_length);
+            // Find the correct port
+            assert( fg_ev->path.size() > fg_ev->hops && "the packet should have already reached the destination");
+            int next_router = fg_ev->path[fg_ev->hops];
+            assert(next_router>=0 && next_router<=num_routers && next_router!= router_id && connectivity.count(next_router));
+            int p=connectivity[next_router];
+            fg_ev->setNextPort(p);   
+        }
+    }
+
+}
 
 internal_router_event* topo_from_graph::process_input(RtrEvent* ev){
     int vn = ev->getRouteVN();
@@ -266,7 +468,7 @@ internal_router_event* topo_from_graph::process_input(RtrEvent* ev){
 internal_router_event* topo_from_graph::process_UntimedData_input(RtrEvent* ev){
     topo_from_graph_event* fg_ev = new topo_from_graph_event();
     fg_ev->setEncapsulatedEvent(ev);
-    fg_ev->dest=ev->getDest();
+    // fg_ev->dest=ev->getDest();
 
     return fg_ev;
 }
@@ -280,7 +482,14 @@ void topo_from_graph::routeUntimedData(int port, internal_router_event* ev, std:
         //     /* code */
         // }
     }else{
-        route_packet(port, 0, ev);
+            
+        int dest_router = get_dest_router(ev->getDest());
+        if ( dest_router == router_id ) {
+            ev->setNextPort(get_dest_local_port(ev->getDest()));
+        } else {
+            int vn = ev->getVN();
+            route_nonadaptive(port,0,ev,dest_router);
+        }
         outPorts.push_back(ev->getNextPort());
     }
 }
