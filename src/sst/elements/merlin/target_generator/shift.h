@@ -43,16 +43,17 @@ public:
     )
 
     int dest;
+    int shift=NULL;
 
 public:
 
     ShiftDist(ComponentId_t cid, Params &params, int id, int num_peers) :
         TargetGenerator(cid)
     {
-        TraceFunction trace(CALL_INFO_LONG);
+        // TraceFunction trace(CALL_INFO_LONG);
         bool found;
-        int shift = params.find<int>("shift",found);
-        trace.output("%d, %d, %d\n", id, num_peers, shift);
+        shift = params.find<int>("shift",found);
+        // trace.output("%d, %d, %d\n", id, num_peers, shift);
         if ( !found ) {
             fatal(CALL_INFO,1,"ERROR: shift must be specified in targetgen.shift\n");
         }
@@ -63,7 +64,8 @@ public:
     }
 
     void initialize(int id, int num_peers) {
-        dest = num_peers - 1 - id;
+        assert(shift);
+        dest = (id + shift) % num_peers;
     }
 
     int getNextValue(void) {
