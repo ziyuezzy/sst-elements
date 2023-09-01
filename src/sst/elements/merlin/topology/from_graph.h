@@ -61,6 +61,7 @@ public:
         adaptive_multipath,
         valiant,
         ugal, //UGAL-L, because UGAL-G is difficult to implement in Merlin (?)
+        ugal_precise, //UGAL-L, precisely calculates the valiant path lengths by keeping a distance table in each router
         ugal_threshold //the cost of the nonminimal path is (2*ql+50), while minimal paths have costs equals to ql
     };
 
@@ -68,6 +69,7 @@ public:
     std::map<int, std::pair<int, std::vector<std::vector<int>>>> routing_table;//key is destination router id, value is a round-robin counter and a list of all possible paths.
     // A dictionary for port connectivity (which port is connected to which router)
     std::map<int, int> connectivity; //key is destination router id, value is port id. However this assumes that there is no parallel link.
+    std::map<std::pair<int, int>, int> distance_table; //key is s-d pair, value is shortest path length (,i.e., distance)
 
     int router_id; // Router id in the graph
     int num_routers; // number of vertices in the graph
@@ -118,6 +120,7 @@ public:
     void route_nonadaptive(int port, int vc, internal_router_event* ev, int dest_router);
     void route_valiant(int port, int vc, internal_router_event* ev, int dest_router);
     void route_ugal(int port, int vc, internal_router_event* ev, int dest_router, int num_VAL);
+    void route_ugal_precise(int port, int vc, internal_router_event* ev, int dest_router, int num_VAL);
     void route_ugal_threshold(int port, int vc, internal_router_event* ev, int dest_router, int num_VAL);
     void route_adaptive(int port, int vc, internal_router_event* ev, int dest_router);
 };

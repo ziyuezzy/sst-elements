@@ -14,7 +14,7 @@ class topoFromGraph(Topology):
     def __init__(self):
         Topology.__init__(self)
         self._declareClassVariables(["link_latency", "host_link_latency", "topo_name", "edgelist_file", "pathdict_file"])
-        self._declareParams("main",["hosts_per_router","graph_num_vertices","graph_degree",
+        self._declareParams("main",["hosts_per_router","graph_num_vertices","graph_degree","ugal_val_options",
                                     "max_path_length","algorithm","adaptive_threshold", 'csv_files_path'])
         self._subscribeToPlatformParamSet("topology")
     
