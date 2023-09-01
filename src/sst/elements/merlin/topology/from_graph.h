@@ -60,7 +60,8 @@ public:
         nonadaptive_multipath,
         adaptive_multipath,
         valiant,
-        ugal //UGAL-L, because UGAL-G is difficult to implement in Merlin (?)
+        ugal, //UGAL-L, because UGAL-G is difficult to implement in Merlin (?)
+        ugal_threshold //the cost of the nonminimal path is (2*ql+50), while minimal paths have costs equals to ql
     };
 
     // A dictionary for routing table
@@ -117,6 +118,7 @@ public:
     void route_nonadaptive(int port, int vc, internal_router_event* ev, int dest_router);
     void route_valiant(int port, int vc, internal_router_event* ev, int dest_router);
     void route_ugal(int port, int vc, internal_router_event* ev, int dest_router, int num_VAL);
+    void route_ugal_threshold(int port, int vc, internal_router_event* ev, int dest_router, int num_VAL);
     void route_adaptive(int port, int vc, internal_router_event* ev, int dest_router);
 };
 
