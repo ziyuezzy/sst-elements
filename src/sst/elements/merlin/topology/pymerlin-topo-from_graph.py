@@ -150,7 +150,8 @@ class topoFromGraph(Topology):
                             check_sum=check_sum+weight
                             if len(path)-1 > self.max_path_length:
                                 self.max_path_length = len(path)-1
-                        assert(check_sum==1.0)
+                        if not round(check_sum,5)==1.0:
+                            raise ValueError(f'probability checksum is not 1.0, but {check_sum} for source = {source}, dest = {destination}')
 
                 csv_writer.writerow(["max_path_length", self.max_path_length])
 
