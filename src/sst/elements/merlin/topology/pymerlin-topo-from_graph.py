@@ -31,6 +31,12 @@ class topoFromGraph(Topology):
         return sst.getRouterNameForId(self.getRouterNameForId(rtr_id))
     
     def build(self, endpoint):
+
+        weighted_paths=False
+        if "weight" in self.algorithms[0]: # assume all vns have the same algorithm
+            weighted_paths=True
+            
+
         #define routers
         routers=[None]*self.graph_num_vertices
         router_radix=self.hosts_per_router+self.graph_degree
@@ -57,7 +63,7 @@ class topoFromGraph(Topology):
         #check directory
         if os.path.exists(self.csv_files_path):
             # if directory already exists, construct network and passdown 'max_path_length' (to save execution time?)
-            #read picked graph structure from file
+            #read pickled graph structure from file
             _CON=[]
             edgelist=pickle.load(open(self.edgelist_file, 'rb'))
             edgelist.sort() # sort the edge list, for the csv file to be more clean
@@ -130,12 +136,22 @@ class topoFromGraph(Topology):
                 csv_writer.writerow(["source", "dest", "path"])
 
                 pathdict=dict(sorted(pickle.load(open(self.pathdict_file, 'rb')).items()))
-                for (source, destination), paths in pathdict.items():
-                    for path in paths:
-                        csv_writer.writerow([source, destination, ' '.join(str(v) for v in path)])
-                        if len(path)-1 > self.max_path_length:
-                            self.max_path_length = len(path)-1
-                            
+                if not weighted_paths:
+                    for (source, destination), paths in pathdict.items():
+                        for path in paths:
+                            csv_writer.writerow([source, destination, ' '.join(str(v) for v in path)])
+                            if len(path)-1 > self.max_path_length:
+                                self.max_path_length = len(path)-1
+                else:
+                    for (source, destination), paths in pathdict.items():
+                        check_sum=0.0
+                        for path, weight in paths:
+                            csv_writer.writerow([source, destination, weight, ' '.join(str(v) for v in path)])
+                            check_sum=check_sum+weight
+                            if len(path)-1 > self.max_path_length:
+                                self.max_path_length = len(path)-1
+                        assert(check_sum==1.0)
+
                 csv_writer.writerow(["max_path_length", self.max_path_length])
 
         

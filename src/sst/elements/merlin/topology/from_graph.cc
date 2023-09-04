@@ -43,6 +43,7 @@ topo_from_graph::topo_from_graph(ComponentId_t cid, Params& params, int num_port
     }
 
     bool construct_distance_table = false;
+    bool path_with_weights =false;
 
     // Setup the routing algorithms
     int curr_vc = 0;
@@ -73,6 +74,11 @@ topo_from_graph::topo_from_graph(ComponentId_t cid, Params& params, int num_port
             vns[i].algorithm = ugal_precise;
             construct_distance_table=true;
             vns[i].num_vcs = max_path_length*2;
+        }
+        else if ( !vn_route_algos[i].compare("nonadaptive_weighted") ) {
+            vns[i].algorithm = nonadaptive_weighted;
+            path_with_weights = true;
+            vns[i].num_vcs = max_path_length;
         }
         else {
             fatal(CALL_INFO_LONG,1,"ERROR: Unknown routing algorithm specified: %s\n",vn_route_algos[i].c_str());
@@ -116,7 +122,7 @@ topo_from_graph::topo_from_graph(ComponentId_t cid, Params& params, int num_port
             }
         }// else, it is in the zoon
 
-        // if (in_the_zoon){
+        if(!path_with_weights){
             std::string destinationStr, ValueStr, nodeStr;
             std::getline(ss, destinationStr, ',');
             std::getline(ss, ValueStr);
@@ -149,10 +155,52 @@ topo_from_graph::topo_from_graph(ComponentId_t cid, Params& params, int num_port
             }else if (construct_distance_table)
             {
                 distance_table[std::make_pair(src_id, dest_id)]=path_to_append.size()-1;
-            }                      
-        // }
+            }    
+        }else{
+            std::string destinationStr, weightStr, ValueStr, nodeStr;
+            std::getline(ss, destinationStr, ',');
+            std::getline(ss, weightStr, ',');
+            std::getline(ss, ValueStr);
+            int dest_id = std::stoi(destinationStr);
+            int path_weight = std::stof(weightStr);
+
+            if (construct_distance_table && distance_table.count(std::make_pair(src_id, dest_id))){
+                continue; //This assumes that the first encountered path is the shortest path
+            }
+
+
+            std::stringstream path_string(ValueStr);
+            std::vector<int> path_to_append;
+            path_to_append.clear();
+            std::getline(path_string, nodeStr, ' ');
+            int next_node = std::stoi(nodeStr);
+            if(in_the_zoon) assert(next_node==router_id);
+            path_to_append.push_back(next_node);
+            for (size_t i = 0; i < max_path_length; i++){
+                if(std::getline(path_string, nodeStr, ' ')){
+                    next_node = std::stoi(nodeStr);
+                    assert(next_node>=0 && next_node<num_routers);
+                    path_to_append.push_back(next_node);
+                }else{
+                    // next_node=-1;
+                    // path_to_append.push_back(next_node);
+                }
+            }
+            if (in_the_zoon){
+                weighted_routing_table[dest_id].push_back(std::make_pair(path_weight, path_to_append));  
+            }else if (construct_distance_table)
+            {
+                distance_table[std::make_pair(src_id, dest_id)]=path_to_append.size()-1;
+            }    
+        }          
+        
     }
-    assert(routing_table.size()==num_routers-1);
+    if(!path_with_weights)
+        assert(routing_table.size()==num_routers-1);
+    else
+        assert(weighted_routing_table.size()==num_routers-1);
+
+
     if (construct_distance_table)
         assert(distance_table.size()==(num_routers-1)*(num_routers-1));
 
@@ -217,6 +265,7 @@ void topo_from_graph::route_packet(int port, int vc, internal_router_event* ev){
         else if ( vns[vn].algorithm == ugal ) return route_ugal(port,vc,ev,dest_router, ugal_val_options);
         else if ( vns[vn].algorithm == ugal_precise ) return route_ugal_precise(port,vc,ev,dest_router, ugal_val_options);
         else if ( vns[vn].algorithm == ugal_threshold ) return route_ugal_threshold(port,vc,ev,dest_router, ugal_val_options);
+        else if ( vns[vn].algorithm == nonadaptive_weighted ) return route_nonadaptive_weighted(port,vc,ev,dest_router, ugal_val_options);
         else fatal(CALL_INFO_LONG,1,"ERROR: Unknown routing algorithm encountered");
     }
 }
@@ -259,6 +308,46 @@ void topo_from_graph::route_nonadaptive(int port, int vc, internal_router_event*
     fg_ev->setNextPort(p);    
     
 }
+
+void topo_from_graph::route_nonadaptive_weighted(int port, int vc, internal_router_event* ev, int dest_router){
+    
+    topo_from_graph_event *fg_ev = static_cast<topo_from_graph_event*>(ev);
+    if(fg_ev->hops==0){
+        assert(fg_ev->path.empty());
+        // Determine the path for this packet   
+        float dice=rng->nextUniform();
+        float _sum=0.0;
+        for (auto path : weighted_routing_table[dest_router])
+        {
+            _sum+=path.first;
+            if(dice>_sum){
+                continue;
+            }else{
+                for (auto i: path.second) fg_ev->path.push_back(i);
+                break;
+            }
+        }
+            
+    }else{
+        assert(!fg_ev->path.empty());
+        //nothing to do
+    }
+    
+    fg_ev->setVC(fg_ev->hops);  
+    fg_ev->hops++;
+    assert(fg_ev->hops <= max_path_length);
+    
+    // Find the correct port
+    assert( fg_ev->path.size() > fg_ev->hops && "the packet should have already reached the destination");
+    int next_router = fg_ev->path[fg_ev->hops];
+    
+    assert(next_router>=0 && next_router<=num_routers && next_router!= router_id && connectivity.count(next_router));
+    int p=connectivity[next_router];
+    fg_ev->setNextPort(p);    
+    
+}
+
+
 
 // void topo_from_graph::route_adaptive(int port, int vc, internal_router_event* ev, int dest_router){
 // // (for now, do not support the path to exceed 'max_path_length' in the imported routing table, but //TODO: this may be able to change)
