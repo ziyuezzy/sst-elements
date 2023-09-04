@@ -162,7 +162,7 @@ topo_from_graph::topo_from_graph(ComponentId_t cid, Params& params, int num_port
             std::getline(ss, weightStr, ',');
             std::getline(ss, ValueStr);
             int dest_id = std::stoi(destinationStr);
-            int path_weight = std::stof(weightStr);
+            float path_weight = std::stof(weightStr);
 
             if (construct_distance_table && distance_table.count(std::make_pair(src_id, dest_id))){
                 continue; //This assumes that the first encountered path is the shortest path
@@ -265,7 +265,7 @@ void topo_from_graph::route_packet(int port, int vc, internal_router_event* ev){
         else if ( vns[vn].algorithm == ugal ) return route_ugal(port,vc,ev,dest_router, ugal_val_options);
         else if ( vns[vn].algorithm == ugal_precise ) return route_ugal_precise(port,vc,ev,dest_router, ugal_val_options);
         else if ( vns[vn].algorithm == ugal_threshold ) return route_ugal_threshold(port,vc,ev,dest_router, ugal_val_options);
-        else if ( vns[vn].algorithm == nonadaptive_weighted ) return route_nonadaptive_weighted(port,vc,ev,dest_router, ugal_val_options);
+        else if ( vns[vn].algorithm == nonadaptive_weighted ) return route_nonadaptive_weighted(port,vc,ev,dest_router);
         else fatal(CALL_INFO_LONG,1,"ERROR: Unknown routing algorithm encountered");
     }
 }
@@ -328,10 +328,8 @@ void topo_from_graph::route_nonadaptive_weighted(int port, int vc, internal_rout
             }
         }
             
-    }else{
-        assert(!fg_ev->path.empty());
-        //nothing to do
     }
+    assert(!fg_ev->path.empty());
     
     fg_ev->setVC(fg_ev->hops);  
     fg_ev->hops++;
@@ -870,7 +868,11 @@ void topo_from_graph::routeUntimedData(int port, internal_router_event* ev, std:
             ev->setNextPort(get_dest_local_port(ev->getDest()));
         } else {
             int vn = ev->getVN();
-            route_nonadaptive(port,0,ev,dest_router);
+            if ( vns[vn].algorithm == nonadaptive_weighted )  //TODO: if add more weighted routing algo, this need to be appended
+                route_nonadaptive_weighted(port,0,ev,dest_router);
+            else
+                route_nonadaptive(port,0,ev,dest_router);
+            
         }
         outPorts.push_back(ev->getNextPort());
     }

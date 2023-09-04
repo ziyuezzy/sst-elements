@@ -33,7 +33,7 @@ class topoFromGraph(Topology):
     def build(self, endpoint):
 
         weighted_paths=False
-        if "weight" in self.algorithms[0]: # assume all vns have the same algorithm
+        if "weight" in self.algorithm[0]: # assume all vns have the same algorithm
             weighted_paths=True
             
 
