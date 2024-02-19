@@ -7,6 +7,10 @@ AM_CPPFLAGS += \
 	$(MPI_CPPFLAGS) \
 	$(PYTHON_CPPFLAGS)
 
+# CPPFLAGS += -O0
+
+# CXXFLAGS += -O0
+
 compdir = $(pkglibdir)
 comp_LTLIBRARIES = libmerlin.la
 
@@ -22,6 +26,7 @@ libmerlin_la_SOURCES = \
 	target_generator/target_generator.h \
 	target_generator/target_generator.cc \
 	target_generator/bit_complement.h \
+	target_generator/bit_reversal.h \
 	target_generator/shift.h \
 	target_generator/uniform.h \
 	test/nic.h \
@@ -46,6 +51,8 @@ libmerlin_la_SOURCES = \
 	topology/fattree.cc \
 	topology/dragonfly.h \
 	topology/dragonfly.cc \
+	topology/from_graph.h \
+	topology/from_graph.cc \
 	topology/singlerouter.h \
 	topology/singlerouter.cc \
 	topology/hyperx.h \
@@ -89,6 +96,7 @@ libmerlin_la_SOURCES = \
 	topology/pymerlin-topo-dragonfly.py \
 	topology/pymerlin-topo-polarfly.py \
 	topology/pymerlin-topo-polarstar.py \
+	topology/pymerlin-topo-from_graph.py \
 	topology/pymerlin-topo-hyperx.py \
 	topology/pymerlin-topo-fattree.py \
 	topology/pymerlin-topo-mesh.py
@@ -141,6 +149,7 @@ BUILT_SOURCES = \
 	topology/pymerlin-topo-dragonfly.inc \
 	topology/pymerlin-topo-polarfly.inc \
 	topology/pymerlin-topo-polarstar.inc \
+	topology/pymerlin-topo-from_graph.inc \
 	topology/pymerlin-topo-hyperx.inc \
 	topology/pymerlin-topo-fattree.inc \
 	topology/pymerlin-topo-mesh.inc

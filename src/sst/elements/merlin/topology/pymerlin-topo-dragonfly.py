@@ -23,7 +23,7 @@ class topoDragonFly(Topology):
 
     def __init__(self):
         Topology.__init__(self)
-        self._declareClassVariables(["link_latency","host_link_latency","global_link_map"])
+        self._declareClassVariables(["link_latency", "global_link_latency","host_link_latency","global_link_map"])
         self._declareParams("main",["hosts_per_router","routers_per_group","intergroup_links","intragroup_links",
                                     "num_groups","algorithm","adaptive_threshold","global_routes",
                                     "config_failed_links","failed_links"])
@@ -71,6 +71,8 @@ class topoDragonFly(Topology):
 
         if self.host_link_latency is None:
             self.host_link_latency = self.link_latency
+        if self.global_link_latency is None:
+            self.global_link_latency = self.link_latency
 
         num_peers = self.hosts_per_router * self.routers_per_group * self.num_groups
 
@@ -194,7 +196,7 @@ class topoDragonFly(Topology):
                 for p in range(igpr):
                     link = getGlobalLink(g,r,p)
                     if link is not None:
-                        rtr.addLink(link,"port%d"%port, self.link_latency)
+                        rtr.addLink(link,"port%d"%port, self.global_link_latency) #TODO: add parameter -- global_link_latency
                     port = port +1
 
                 router_num = router_num + 1

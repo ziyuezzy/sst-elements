@@ -338,7 +338,7 @@ topo_dragonfly::~topo_dragonfly()
 }
 
 
-void topo_dragonfly::route_nonadaptive(int port, int vc, internal_router_event* ev)
+void topo_dragonfly::route_nonadaptive(int port, int vc, internal_router_event* ev) //This is the implementation of MIN routing algo -- mark by ziyue
 {
     topo_dragonfly_event *td_ev = static_cast<topo_dragonfly_event*>(ev);
 

@@ -60,6 +60,14 @@ class BitComplementTarget(TargetGenerator):
         return "merlin.targetgen.bit_complement"
 
 
+class BitReversalTarget(TargetGenerator):
+    def __init__(self):
+        TargetGenerator.__init__(self)
+
+    def getTypeName(self):
+        return "merlin.targetgen.bit_reversal"
+
+
 class ShiftTarget(TargetGenerator):
     def __init__(self):
         TargetGenerator.__init__(self)
