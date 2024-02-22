@@ -113,7 +113,9 @@ class BasicNicConfiguration(TemplateBase):
             "messageSendAlignment", "nicAllocationPolicy",
             "packetOverhead", "packetSize",
             "maxActiveRecvStreams", "maxPendingRecvPkts",
-            "dmaBW_GBs", "dmaContentionMult",
+            "dmaBW_GBs", "dmaContentionMult","measure_InterNIC_traffic",
+            "InterNIC_traffic_sample_period",
+            "Num_NICs", "InterNIC_traffic_output_file"
             ])
 
         self._declareParams("main",["useSimpleMemoryModel"])

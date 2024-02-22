@@ -25,7 +25,7 @@ class topoFromGraph(Topology):
         return self.graph_num_vertices*self.hosts_per_router
     
     def getRouterNameForId(self,rtr_id):
-        return "%srouter%d"%(self._prefix, rtr_id)
+        return "router%d"%(rtr_id)
     
     def findRouterByLocation(self,rtr_id):
         return sst.getRouterNameForId(self.getRouterNameForId(rtr_id))

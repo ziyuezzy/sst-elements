@@ -2,6 +2,10 @@
 #
 #
 
+# CPPFLAGS += -O0
+
+# CXXFLAGS += -O0
+
 AM_CPPFLAGS += $(MPI_CPPFLAGS) \
 	-I$(top_srcdir)/src
 

@@ -33,6 +33,11 @@ int Nic::m_packetId = 0;
 int Nic::ShmemSendMove::m_alignment = 64;
 int Nic::EntryBase::m_alignment = 1;
 
+// added by ziyue.zhang@ugent.be: trying to measure inter-NIC traffic pattern
+std::vector<std::vector<int>> Nic::inter_NIC_traffic;
+unsigned long int Nic::last_cleanup_ns = 0;
+std::string Nic::NIC_traffic_output_file = "";
+
 Nic::Nic(ComponentId_t id, Params &params) :
     Component( id ),
     m_detailedCompute( 2, NULL ),
@@ -323,10 +328,36 @@ Nic::Nic(ComponentId_t id, Params &params) :
     Statistic<uint64_t>* m_rcvdByteCount;
     Statistic<uint64_t>* m_sentPkts;
     Statistic<uint64_t>* m_rcvdPkts;
+
+    // added by ziyue.zhang@ugent.be: trying to measure inter-NIC traffic pattern
+    // std::cout<< "trying to find new params"<<std::endl;
+    num_all_nics=params.find<int>("Num_NICs",0);
+    measure_inter_NIC_traffic=params.find<bool>("measure_InterNIC_traffic",false);
+    NIC_traffic_sample_period=params.find<long int>("InterNIC_traffic_sample_period",0); //default is +inf
+    if(measure_inter_NIC_traffic && NIC_traffic_output_file.empty()){
+        bool found_output_file;
+        NIC_traffic_output_file=params.find<std::string>("InterNIC_traffic_output_file", "", found_output_file);
+        assert(found_output_file && "output file path must be specified");
+        std::cout<< "NIC_traffic_output_file path found:"<<NIC_traffic_output_file<<std::endl;
+        clean_NIC_traffic_data();
+    }
 }
 
 Nic::~Nic()
 {
+    // added by ziyue.zhang@ugent.be: trying to measure inter-NIC traffic pattern
+    if (measure_inter_NIC_traffic)
+    {
+        // make sure the writting process only executes once per sampling period
+        if (last_cleanup_ns!=getCurrentSimTimeNano()){
+            last_cleanup_ns=getCurrentSimTimeNano();
+            // write data, clean up data, ready for the next sampling period
+            write_NIC_traffic_data();
+            clean_NIC_traffic_data();
+            
+        }
+    }
+
 	delete m_shmem;
 	delete m_unitPool;
  	delete m_linkSendWidget;
@@ -650,7 +681,22 @@ void Nic::sendPkt( FireflyNetworkEvent* ev, int dest, int vn )
                                                     ev->isTail() ? "Tail":"" );
 
 	m_sentByteCount->addData( ev->payloadSize() );
-
+    // added by ziyue.zhang@ugent.be: trying to measure inter-NIC traffic pattern
+    if (measure_inter_NIC_traffic)
+    {
+        // make sure the writting process only executes once per sampling period
+        if (NIC_traffic_sample_period && 
+        getCurrentSimTimeNano()%NIC_traffic_sample_period==0 && 
+        last_cleanup_ns!=getCurrentSimTimeNano()){
+            last_cleanup_ns=getCurrentSimTimeNano();
+            // write data, clean up data, ready for the next sampling period
+            write_NIC_traffic_data();
+            clean_NIC_traffic_data();
+            
+        }
+    inter_NIC_traffic[req->src][req->dest]+=ev->payloadSize();
+    }
+    
     bool sent = m_linkControl->send( req, vn );
     assert( sent );
 }
@@ -786,5 +832,30 @@ Hermes::MemAddr Nic::findShmem(  int core, Hermes::Vaddr addr, size_t length )
     }
 
     return region.first.offset(offset);
+}
+
+void Nic::clean_NIC_traffic_data(){
+    inter_NIC_traffic.assign(num_all_nics, std::vector<int>(num_all_nics, 0));
+}
+
+void Nic::write_NIC_traffic_data(){
+    std::ofstream outputFile(NIC_traffic_output_file, std::ios::app);
+    if (outputFile.is_open()) {
+        
+        outputFile << "TrafficAt" << getCurrentSimTimeNano() <<"ns:" << std::endl;
+        for (int i = 0; i < num_all_nics; ++i) {
+            for (int j = 0; j < num_all_nics; ++j) {
+                outputFile << inter_NIC_traffic[i][j];
+                if (j < num_all_nics - 1) {
+                    outputFile << ",";
+                }
+            }
+            outputFile << std::endl;
+        }
+        outputFile.close();
+        // std::cout << "Matrix has been written to matrix.txt" << std::endl;
+    } else {
+        std::cerr << "Unable to open file "<< NIC_traffic_output_file<< " for writing." << std::endl;
+    }
 }
 
