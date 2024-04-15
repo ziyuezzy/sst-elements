@@ -55,7 +55,7 @@ added_m4_list=
 for file in `ls $BASE_DIR/src/sst/elements`; do
 
     #added by ziyue: only build Merlin and ember
-    if [[ "$file" != *"merlin"* && "$file" != *"ember"* && "$file" != *"firefly"* ]]; then
+    if [[ "$file" != *"merlin"* && "$file" != *"ember"* && "$file" != *"firefly"* && "$file" != *"hermes"* ]]; then
         continue
     fi
 

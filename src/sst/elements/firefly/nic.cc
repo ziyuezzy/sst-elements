@@ -34,9 +34,10 @@ int Nic::ShmemSendMove::m_alignment = 64;
 int Nic::EntryBase::m_alignment = 1;
 
 // added by ziyue.zhang@ugent.be: trying to measure inter-NIC traffic pattern
-std::vector<std::vector<int>> Nic::inter_NIC_traffic;
-unsigned long int Nic::last_cleanup_ns = 0;
-std::string Nic::NIC_traffic_output_file = "";
+std::string Nic::m_interNIC_traffic_tracefile_path = "";
+std::ofstream Nic::interNIC_traffic_trace;
+std::mutex Nic::of_mutex;
+std::mutex Nic::pktid_mutex;
 
 Nic::Nic(ComponentId_t id, Params &params) :
     Component( id ),
@@ -331,33 +332,38 @@ Nic::Nic(ComponentId_t id, Params &params) :
 
     // added by ziyue.zhang@ugent.be: trying to measure inter-NIC traffic pattern
     // std::cout<< "trying to find new params"<<std::endl;
-    num_all_nics=params.find<int>("Num_NICs",0);
-    measure_inter_NIC_traffic=params.find<bool>("measure_InterNIC_traffic",false);
-    NIC_traffic_sample_period=params.find<long int>("InterNIC_traffic_sample_period",0); //default is +inf
-    if(measure_inter_NIC_traffic && NIC_traffic_output_file.empty()){
+    m_gen_InterNIC_traffic_trace=params.find<bool>("gen_InterNIC_traffic_trace",false);
+    if(m_gen_InterNIC_traffic_trace && m_interNIC_traffic_tracefile_path.empty()){
         bool found_output_file;
-        NIC_traffic_output_file=params.find<std::string>("InterNIC_traffic_output_file", "", found_output_file);
+        m_interNIC_traffic_tracefile_path=params.find<std::string>("interNIC_traffic_tracefile_path", "", found_output_file);
         assert(found_output_file && "output file path must be specified");
-        std::cout<< "NIC_traffic_output_file path found:"<<NIC_traffic_output_file<<std::endl;
-        clean_NIC_traffic_data();
+        std::cout<< "NIC_traffic_output_file path found:"<<m_interNIC_traffic_tracefile_path<<std::endl;
+        RankInfo rank_info = getRank();
+
+        std::lock_guard<std::mutex> lock(of_mutex);
+        if (!interNIC_traffic_trace.is_open()){
+            interNIC_traffic_trace.open(m_interNIC_traffic_tracefile_path,  std::ios::out | std::ios::trunc);
+            if (!interNIC_traffic_trace.is_open())
+                std::cerr << "Unable to open file "<< m_interNIC_traffic_tracefile_path<< " for writing." << std::endl;
+            
+            interNIC_traffic_trace<<"time_ns"<<","<<"srcNIC"<<","<<"destNIC"<<","<<"Size_Bytes"<<"," << "pkt_id"<<"," << "type" <<std::endl;
+        }
+
+        // if (rank_info.rank==0 && rank_info.thread==0 && !interNIC_traffic_trace.is_open()){
+        //     interNIC_traffic_trace.open(m_interNIC_traffic_tracefile_path,  std::ios::out | std::ios::trunc);
+        //     if (!interNIC_traffic_trace.is_open())
+        //         std::cerr << "Unable to open file "<< m_interNIC_traffic_tracefile_path<< " for writing." << std::endl;
+            
+        //     interNIC_traffic_trace<<"time_ns"<<","<<"srcNIC"<<","<<"destNIC"<<","<<"Size_Bytes"<<std::endl;
+        // }
     }
 }
 
 Nic::~Nic()
 {
-    // added by ziyue.zhang@ugent.be: trying to measure inter-NIC traffic pattern
-    if (measure_inter_NIC_traffic)
-    {
-        // make sure the writting process only executes once per sampling period
-        if (last_cleanup_ns!=getCurrentSimTimeNano()){
-            last_cleanup_ns=getCurrentSimTimeNano();
-            // write data, clean up data, ready for the next sampling period
-            write_NIC_traffic_data();
-            clean_NIC_traffic_data();
-            
-        }
-    }
-
+    RankInfo rank_info = getRank();
+    if (rank_info.rank==0 && rank_info.thread==0 && interNIC_traffic_trace.is_open())
+        interNIC_traffic_trace.close();
 	delete m_shmem;
 	delete m_unitPool;
  	delete m_linkSendWidget;
@@ -668,11 +674,17 @@ void Nic::sendPkt( FireflyNetworkEvent* ev, int dest, int vn )
     req->vn = vn;
     req->givePayload( ev );
 
+    if (m_gen_InterNIC_traffic_trace)
+    {
+        std::unique_lock<std::mutex> lock(pktid_mutex);
+        req->setTraceID( m_packetId );
+        ++m_packetId;
+        lock.unlock();
+    }
+
     if ( (m_tracedPkt == m_packetId || m_tracedPkt == -2) && m_tracedNode == getNodeId() )
     {
         req->setTraceType( SimpleNetwork::Request::ROUTE );
-        req->setTraceID( m_packetId );
-        ++m_packetId;
     }
     m_dbg.debug(CALL_INFO,3,NIC_DBG_SEND_NETWORK,
                     "node=%" PRIu64 " bytes=%zu packetId=%" PRIu64 " %s %s\n",req->dest,
@@ -682,19 +694,11 @@ void Nic::sendPkt( FireflyNetworkEvent* ev, int dest, int vn )
 
 	m_sentByteCount->addData( ev->payloadSize() );
     // added by ziyue.zhang@ugent.be: trying to measure inter-NIC traffic pattern
-    if (measure_inter_NIC_traffic)
+    if (m_gen_InterNIC_traffic_trace)
     {
-        // make sure the writting process only executes once per sampling period
-        if (NIC_traffic_sample_period && 
-        getCurrentSimTimeNano()%NIC_traffic_sample_period==0 && 
-        last_cleanup_ns!=getCurrentSimTimeNano()){
-            last_cleanup_ns=getCurrentSimTimeNano();
-            // write data, clean up data, ready for the next sampling period
-            write_NIC_traffic_data();
-            clean_NIC_traffic_data();
-            
-        }
-    inter_NIC_traffic[req->src][req->dest]+=ev->payloadSize();
+        uint64_t current_sim_time_ns = getCurrentSimTimeNano();
+        write_NIC_traffic_data(current_sim_time_ns, req->src, req->dest, ev->payloadSize(),
+        req->getTraceID(), "in");
     }
     
     bool sent = m_linkControl->send( req, vn );
@@ -834,28 +838,12 @@ Hermes::MemAddr Nic::findShmem(  int core, Hermes::Vaddr addr, size_t length )
     return region.first.offset(offset);
 }
 
-void Nic::clean_NIC_traffic_data(){
-    inter_NIC_traffic.assign(num_all_nics, std::vector<int>(num_all_nics, 0));
-}
 
-void Nic::write_NIC_traffic_data(){
-    std::ofstream outputFile(NIC_traffic_output_file, std::ios::app);
-    if (outputFile.is_open()) {
-        
-        outputFile << "TrafficAt" << getCurrentSimTimeNano() <<"ns:" << std::endl;
-        for (int i = 0; i < num_all_nics; ++i) {
-            for (int j = 0; j < num_all_nics; ++j) {
-                outputFile << inter_NIC_traffic[i][j];
-                if (j < num_all_nics - 1) {
-                    outputFile << ",";
-                }
-            }
-            outputFile << std::endl;
-        }
-        outputFile.close();
-        // std::cout << "Matrix has been written to matrix.txt" << std::endl;
-    } else {
-        std::cerr << "Unable to open file "<< NIC_traffic_output_file<< " for writing." << std::endl;
-    }
+void Nic::write_NIC_traffic_data(uint64_t sim_time_ns, uint32_t NIC_src, uint32_t NIC_dest, uint16_t size_bytes, 
+                                uint32_t pkt_id, std::string type){
+    
+    std::lock_guard<std::mutex> lock(of_mutex); // ensure data integrity
+    // assert(interNIC_traffic_trace.is_open());
+    interNIC_traffic_trace<< sim_time_ns <<","<< NIC_src<<","<< NIC_dest<<","<< size_bytes<<"," << pkt_id <<"," << type << std::endl;
 }
 

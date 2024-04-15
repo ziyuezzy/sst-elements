@@ -13,6 +13,7 @@
 // information, see the LICENSE file in the top level directory of the
 // distribution.
 
+#include <sst/core/component.h>
 
 class RecvMachine {
 
@@ -202,6 +203,14 @@ class RecvMachine {
                     static_cast<FireflyNetworkEvent*>(payload);
                 event->setSrcNode( m_nic.NetToId( req->src ) );
 				m_nic.m_rcvdByteCount->addData( event->payloadSize() );
+                // added by ziyue.zhang@ugent.be: trying to measure inter-NIC traffic pattern
+                if (m_nic.gen_InterNIC_traffic_trace())
+                {
+                    uint64_t current_sim_time_ns = m_nic.nic_getCurrentSimTimeNano();
+                    m_nic.write_NIC_traffic_data(current_sim_time_ns, req->src, req->dest, event->payloadSize(),
+                    req->getTraceID(), "out");
+                }
+
                 delete req;
                 if ( ! event->isCtrl() && event->isHdr() ) {
                     ++m_numMsgRcvd;

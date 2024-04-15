@@ -26,6 +26,7 @@
 #include <sst/core/link.h>
 #include <iostream>
 #include <fstream>
+#include <mutex>
 
 #include "sst/elements/hermes/shmemapi.h"
 #include "sst/elements/thornhill/detailedCompute.h"
@@ -668,14 +669,24 @@ struct X {
     size_t m_shmemPutThresholdLength;
 
     // added by ziyue.zhang@ugent.be: trying to measure inter-NIC traffic pattern
-    bool measure_inter_NIC_traffic;
-    unsigned long int NIC_traffic_sample_period; // [ns]
-    static unsigned long int last_cleanup_ns; // the last time the traffic data was cleaned up and written
-    static std::string NIC_traffic_output_file;
-    static std::vector<std::vector<int>> inter_NIC_traffic;
-    int num_all_nics; // total number of NICs
-    void clean_NIC_traffic_data();
-    void write_NIC_traffic_data();
+    bool m_gen_InterNIC_traffic_trace;
+    static std::string m_interNIC_traffic_tracefile_path;
+    static std::mutex of_mutex;
+    static std::mutex pktid_mutex;
+    static std::ofstream interNIC_traffic_trace;
+
+    public:
+    bool gen_InterNIC_traffic_trace(){
+        return m_gen_InterNIC_traffic_trace;
+    }
+
+    // void clean_NIC_traffic_data();
+    void write_NIC_traffic_data(uint64_t sim_time_ns, uint32_t NIC_src, uint32_t NIC_dest, uint16_t size_bytes, 
+        uint32_t pkt_id, std::string type);
+
+    uint64_t nic_getCurrentSimTimeNano(){
+        return (size_t) getCurrentSimTimeNano();
+    }
 
 };
 
