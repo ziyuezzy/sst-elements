@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -147,7 +147,11 @@ class NetworkMessage : public Flow
 
   bool isMetadata() const;
 
-  virtual NetworkMessage* cloneInjectionAck() const = 0;
+  //virtual NetworkMessage* cloneInjectionAck() const = 0;
+  virtual NetworkMessage* cloneInjectionAck() const {
+    sst_hg_abort_printf("cloneInjectionAck should be overriden\n");
+    return nullptr;
+  }
 
   void nicReverse(type_t newtype);
 

@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -37,6 +37,7 @@
 #include "os/syscall/openat.h"
 #include "os/syscall/close.h"
 #include "os/syscall/lseek.h"
+#include "os/syscall/checkpoint.h"
 #include "os/syscall/brk.h"
 #include "os/syscall/mmap.h"
 #include "os/syscall/unmap.h"
@@ -77,6 +78,10 @@ VanadisSyscall* VanadisNodeOSComponent::handleIncomingSyscall( OS::ProcessInfo* 
     // for now we will leave this inconsistency
     // ***********************************
     switch (sys_ev->getOperation()) {
+        case SYSCALL_OP_CHECKPOINT: {
+            assert ( CHECKPOINT_SAVE == m_checkpoint ); 
+            syscall = new VanadisCheckpointSyscall( this, coreLink, process, convertEvent<VanadisSyscallCheckpointEvent*>( "checkpoint", sys_ev ) );
+        } break;
         case SYSCALL_OP_SET_ROBUST_LIST: {
             syscall = new VanadisSetRobustListSyscall( this, coreLink, process, convertEvent<VanadisSyscallSetRobustListEvent*>( "set_robust_list", sys_ev ) );
         } break;

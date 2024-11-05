@@ -19,7 +19,8 @@ platdef.addParamSet("network_interface",{
     "output_buf_size" : "16kB"
 })
 
-platdef.addClassType("network_interface","sst.merlin.interface.LinkControl")
+#platdef.addClassType("network_interface","sst.merlin.interface.LinkControl")
+platdef.addClassType("network_interface","sst.merlin.interface.ReorderLinkControl")
 
 platdef.addParamSet("router",{
     "link_bw" : "12 GB/s",

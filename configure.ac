@@ -6,7 +6,7 @@
 AC_INIT([SST Elements Library],[-dev],[sst@sandia.gov])
 
 AC_PREREQ([2.59])
-AC_COPYRIGHT([Copyright National Technology and Engineering Solutions of Sandia (NTESS), 2004-2023])
+AC_COPYRIGHT([Copyright National Technology and Engineering Solutions of Sandia (NTESS), 2004-2024])
 
 AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_MACRO_DIR([config])
@@ -41,6 +41,8 @@ LTDL_INIT([recursive])
 
 AC_CACHE_SAVE
 
+SST_CHECK_ARIEL_MPI([], [AC_MSG_ERROR([Can't enable Ariel MPI])])
+
 SST_CORE_CHECK_INSTALL()
 
 SST_CHECK_OSX()
@@ -57,6 +59,8 @@ AS_IF([test "x$use_picky" = "xyes"],
       [WARNFLAGS=""])
 AM_CFLAGS="$AM_CFLAGS $WARNFLAGS"
 AM_CXXFLAGS="$AM_CXXFLAGS $WARNFLAGS"
+
+AM_EXTRA_RECURSIVE_TARGETS([snippets])
 
 AC_MSG_CHECKING([for SST-Elements Git Branch, Head SHA and Commit Count])
 if test -d ".git" ; then

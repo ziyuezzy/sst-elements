@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -51,7 +51,7 @@ void loadPages( SST::Output* output, SST::Interfaces::StandardMem* mem_if, MMU_L
         std::vector< uint8_t > pageBuffer( buffer.begin() + offset, buffer.begin() + offset + page_size );
 #endif
 
-        printf( "pageVirtAddr=%#" PRIx64 " physPageNum=%d physAddr=%#" PRIx64 "\n", pageVirtAddr, physPageNum, physAddr );
+        
         output->verbose( CALL_INFO, 2, 0, "pageVirtAddr=%#" PRIx64 " physPageNum=%d physAddr=%#" PRIx64 "\n", pageVirtAddr, physPageNum, physAddr );
 
 #if 1

@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -57,18 +57,21 @@
  *  - Use of printStatus() and emergencyShutdown()
  */
 
+// SSTSnippet::component-header::start
 #include <sst/core/component.h>
 #include <sst/core/link.h>
 
-
+// SSTSnippet::component-header::pause
 namespace SST {
 namespace simpleElementExample {
 
 
 // Components inherit from SST::Component
+// SSTSnippet::component-header::start
 class basicSimLifeCycle : public SST::Component
 {
 public:
+// SSTSnippet::component-header::pause
 
 /*
  *  SST Registration macros register Components with the SST Core and 
@@ -105,11 +108,15 @@ public:
 // Class members
 
     // Constructor. Components receive a unique ID and the set of parameters that were assigned in the Python input.
+// SSTSnippet::component-header::start
     basicSimLifeCycle(SST::ComponentId_t id, SST::Params& params);
+// SSTSnippet::component-header::pause
     
     // Destructor
+// SSTSnippet::component-header::start
     virtual ~basicSimLifeCycle();
 
+// SSTSnippet::component-header::pause
     // Called by SST during SST's init() lifecycle phase
     virtual void init(unsigned phase) override;
 
@@ -131,11 +138,18 @@ public:
     // Event handler, called when an event is received
     void handleEvent(SST::Event *ev);
 
+// Serialization
+    basicSimLifeCycle();
+    void serialize_order(SST::Core::Serialization::serializer& ser) override;
+    ImplementSerializable(SST::simpleElementExample::basicSimLifeCycle)
 
+// SSTSnippet::component-header::start
 private:
     // Parameters
     unsigned eventsToSend;
+// SSTSnippet::component-header::pause
     bool verbose;
+// SSTSnippet::component-header::start
 
     // Component state
     unsigned eventsReceived;                // Number of events we've received
@@ -154,6 +168,7 @@ private:
     SST::Link* leftLink;
     SST::Link* rightLink;
 };
+// SSTSnippet::component-header::end
 
 } // namespace simpleElementExample
 } // namespace SST

@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -672,8 +672,10 @@ bool MESISharNoninclusive::handlePutS(MemEvent * event, bool inMSHR) {
         case M_Inv:
         case SM_Inv:
             removeSharerViaInv(event, tag, data, true);
-            if (mshr_->decrementAcksNeeded(addr))
+            if (mshr_->decrementAcksNeeded(addr)) {
                 tag->setState(NextState[state]);
+                retry(addr);
+            }
             sendWritebackAck(event);
             if (inMSHR || !mshr_->getProfiled(addr)) {
                 stat_eventState[(int)Command::PutS][state]->addData(1);

@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -100,10 +100,10 @@ public:
 
     void memReqIsDone(bool) {
         if ( ReadIoVecTable == m_state ) {
-            m_output->verbose(CALL_INFO, 3, VANADIS_OS_DBG_SYSCALL, "[syscall-%s] read ioVecTable complete\n", getName().c_str());
+            m_output->verbose(CALL_INFO, 16, VANADIS_OS_DBG_SYSCALL, "[syscall-%s] read ioVecTable complete\n", getName().c_str());
             m_state = IoVecTransfer;
             for ( int i =0; i < getEvent<VanadisSyscallIoVecEvent*>()->getIOVecCount(); i++ ) {
-                m_output->verbose(CALL_INFO, 3, VANADIS_OS_DBG_SYSCALL, "[syscall-%s] addr=%#" PRIx64 " length=%zu\n",
+                m_output->verbose(CALL_INFO, 16, VANADIS_OS_DBG_SYSCALL, "[syscall-%s] addr=%#" PRIx64 " length=%zu\n",
                     getName().c_str(), m_ioVecTable->getAddr(i),m_ioVecTable->getLength(i));
             }
             if ( findNonZeroIoVec() )  {

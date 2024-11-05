@@ -6,6 +6,13 @@ mh_debug=0
 dbgAddr="0"
 stopDbg="0"
 
+checkpointDir = ""
+checkpoint = ""
+
+#checkpointDir = "checkpoint0"
+#checkpoint = "load"
+#checkpoint = "save"
+
 pythonDebug=False
 
 vanadis_isa = os.getenv("VANADIS_ISA", "MIPS")
@@ -47,6 +54,7 @@ exe = "hello-world"
 #exe = "openmp2"
 #exe = "uname"
 #exe = "mem-test"
+#exe = "checkpoint"
 
 physMemSize = "4GiB"
 
@@ -133,8 +141,9 @@ osParams = {
     "page_size"  : 4096,
     "physMemSize" : physMemSize,
     "useMMU" : True,
+    "checkpointDir" : checkpointDir,
+    "checkpoint" : checkpoint
 }
-
 
 processList = ( 
     ( 1, {
@@ -143,10 +152,6 @@ processList = (
         "exe" : full_exe_name,
         "arg0" : exe_name,
     } ),
-    #( 1, {
-    #    "env_count" : 2, "env0" : "HOME=/home/sdhammo", "env1" : "NEWHOME=/home/sdhammo2", "argc" : 1, "exe" : "./tests/small/basic-io/hello-world/mipsel/hello-world",  
-        #"exe" : "./tests/small/basic-io/read-write/mipsel/read-write",  
-    #} ),
 )
 
 processList[0][1].update(app_params)
@@ -205,7 +210,8 @@ memCtrlParams = {
       "addr_range_end": 0xffffffff,
       "debug_level" : mh_debug_level,
       "debug" : mh_debug,
-
+      "checkpointDir" : checkpointDir,
+      "checkpoint" : checkpoint
 }
 
 memParams = {
@@ -260,6 +266,8 @@ cpuParams = {
     "start_verbose_when_issue_address": dbgAddr,
     "stop_verbose_when_retire_address": stopDbg,
     "print_rob" : False,
+    "checkpointDir" : checkpointDir,
+    "checkpoint" : checkpoint
 }
 
 lsqParams = {

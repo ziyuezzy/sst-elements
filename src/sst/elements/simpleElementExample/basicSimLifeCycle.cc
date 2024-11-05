@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -60,8 +60,8 @@ basicSimLifeCycle::basicSimLifeCycle(ComponentId_t id, Params& params) : Compone
     verbose = params.find<bool>("verbose", false);
 
     // configure our links with a callback function that will be called whenever an event arrives
-    leftLink = configureLink("left", new Event::Handler<basicSimLifeCycle>(this, &basicSimLifeCycle::handleEvent));
-    rightLink = configureLink("right", new Event::Handler<basicSimLifeCycle>(this, &basicSimLifeCycle::handleEvent));
+    leftLink = configureLink("left", new Event::Handler2<basicSimLifeCycle, &basicSimLifeCycle::handleEvent>(this));
+    rightLink = configureLink("right", new Event::Handler2<basicSimLifeCycle, &basicSimLifeCycle::handleEvent>(this));
 
     // Make sure we successfully configured the links
     // Failure usually means the user didn't connect the port in the input file
@@ -294,4 +294,51 @@ void basicSimLifeCycle::emergencyShutdown() {
 void basicSimLifeCycle::printStatus(Output& sim_out) {
     sim_out.output("%s reporting. I have sent %u messages, received %u, and forwarded %u.\n", 
             getName().c_str(), eventsSent, eventsReceived, eventsForwarded);
+}
+
+/*
+ * Default constructor
+*/
+basicSimLifeCycle::basicSimLifeCycle() : Component() {}
+
+/*
+ * Serialization function
+*/
+void basicSimLifeCycle::serialize_order(SST::Core::Serialization::serializer& ser) {
+    Component::serialize_order(ser);
+
+    SST_SER(eventsToSend);
+    SST_SER(verbose);
+
+    SST_SER(eventsReceived);
+    SST_SER(eventsForwarded);
+    SST_SER(eventsSent);
+    SST_SER(neighbors);
+
+    SST_SER(leftMsg);
+    SST_SER(rightMsg);
+
+    SST_SER(out);
+
+    SST_SER(leftLink);
+    SST_SER(rightLink);
+
+    // Handle 'iter' neighbor iterator
+    switch ( ser.mode() ) {
+        case SST::Core::Serialization::serializer::SIZER:
+        case SST::Core::Serialization::serializer::PACK:
+            break;
+        case SST::Core::Serialization::serializer::UNPACK:
+        {
+            //Reinitialize iter from neighbors
+            int index = eventsSent % neighbors.size();
+            iter = neighbors.begin();
+            std::advance(iter, index);
+
+            break;
+        }
+        case SST::Core::Serialization::serializer::MAP:
+            // Mapping mode not supported
+            break;
+    }
 }

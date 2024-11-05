@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -113,6 +113,8 @@ class App : public Thread
   int putenv(char* input);
 
   int setenv(const std::string& name, const std::string& value, int overwrite);
+
+  OperatingSystem* os() {return os_;}
 
   /**
    * Let a parent application know about the existence of a subthread
@@ -228,7 +230,7 @@ class App : public Thread
     dlcloseCheck(aid());
   }
 
- OperatingSystem* os_;
+  OperatingSystem* os_;
 
   char* allocateDataSegment(bool tls);
 

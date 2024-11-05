@@ -5,42 +5,13 @@ from sst_unittest_support import *
 import os
 import inspect
 
-################################################################################
-# Code to support a single instance module initialize, must be called setUp method
-
-module_init = 0
-module_sema = threading.Semaphore()
-
-def initializeTestModule_SingleInstance(class_inst):
-    global module_init
-    global module_sema
-
-    module_sema.acquire()
-    if module_init != 1:
-        try:
-            # Put your single instance Init Code Here
-            class_inst._setup_ariel_test_files()
-        except:
-            pass
-        module_init = 1
-    module_sema.release()
-
-################################################################################
-################################################################################
-################################################################################
-
 
 class testcase_Ariel(SSTTestCase):
 
-    def initializeClass(self, testName):
-        super(type(self), self).initializeClass(testName)
-        # Put test based setup code here. it is called before testing starts
-        # NOTE: This method is called once for every test
-
     def setUp(self):
         super(type(self), self).setUp()
-        initializeTestModule_SingleInstance(self)
         # Put test based setup code here. it is called once before every test
+        self._setup_ariel_test_files()
 
     def tearDown(self):
         # Put test based teardown code here. it is called once after every test
@@ -55,7 +26,7 @@ class testcase_Ariel(SSTTestCase):
 
     pin_loaded = testing_is_PIN_loaded()
 
-    pin_error_msg = "Ariel: Requires PIN, but Env Var 'INTEL_PIN_DIR' is not found or path does not exist."
+    pin_error_msg = "Ariel: Requires PIN, but Env Var 'INTEL_PIN_DIRECTORY' is not found or path does not exist."
 
     # This is not an exhausitve list of tests, but it covers most of the options.
 
@@ -234,7 +205,7 @@ class testcase_Ariel(SSTTestCase):
         # Build the testio binary
         cmd = "make testio"
         rtn1 = OSCommand(cmd, set_cwd=self.ArielElementTestIODir).run()
-        log_debug("Ariel ariel/tests/testIO make result = {1}; output =\n{2}".format(ArielElementTestIODir, rtn1.result(), rtn1.output()))
+        log_debug("Ariel ariel/tests/testIO make result = {1}; output =\n{2}".format(self.ArielElementTestIODir, rtn1.result(), rtn1.output()))
 
         # Check that everything compiled OK
         self.assertTrue(rtn0.result() == 0, "libarielapi failed to compile")

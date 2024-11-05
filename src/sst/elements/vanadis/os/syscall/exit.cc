@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -26,13 +26,13 @@ using namespace SST::Vanadis;
 VanadisExitSyscall::VanadisExitSyscall( VanadisNodeOSComponent* os, SST::Link* coreLink, OS::ProcessInfo* process, VanadisSyscallExitEvent* event )
         : VanadisSyscall( os, coreLink, process, event, "exit" )
 {
-    m_output->verbose(CALL_INFO, 16, 0, "[syscall-exit] core %d thread %d process %d\n",event->getCoreID(), event->getThreadID(), process->getpid() );
+    m_output->verbose(CALL_INFO, 16, VANADIS_OS_DBG_SYSCALL, "[syscall-exit] core %d thread %d process %d\n",event->getCoreID(), event->getThreadID(), process->getpid() );
 
     if ( m_os->getNodeNum() >= 0 ) {
         printf("node=%d pid=%d tid=%d has exited\n", m_os->getNodeNum(), process->getpid(), process->gettid());
     } else {
         if ( event->getExitCode() > 0 ) {
-            printf("pid=%d tid=%d has exited with code %d, Failed\n", process->getpid(), process->gettid(),event->getExitCode());
+            printf("pid=%d tid=%d has exited with code %llu, Failed\n", process->getpid(), process->gettid(),event->getExitCode());
         } else {
             printf("pid=%d tid=%d has exited\n", process->getpid(), process->gettid());
         }
@@ -55,15 +55,15 @@ void VanadisExitSyscall::memReqIsDone(bool) {
 
     auto syscall = m_process->findFutex( m_process->getTidAddress());
     if ( syscall ) {
-        m_output->verbose(CALL_INFO, 3, VANADIS_OS_DBG_SYSCALL,
-            "[syscall-futex] FUTEX_WAKE tid=%d addr=%#" PRIx64 " found waiter, wakeup tid=%d\n",
+        m_output->verbose(CALL_INFO, 16, VANADIS_OS_DBG_SYSCALL,
+            "[syscall-exit] FUTEX_WAKE tid=%d addr=%#" PRIx64 " found waiter, wakeup tid=%d\n",
             m_process->gettid(), m_process->getTidAddress(), syscall->getTid());
         dynamic_cast<VanadisFutexSyscall*>( syscall )->wakeup();
         delete syscall;
     }
 
     m_os->removeThread( event->getCoreID(),event->getThreadID(), m_process->gettid() );
-    m_output->verbose(CALL_INFO, 16, 0, "[syscall-exit] %s() called\n",__func__ );
+    m_output->verbose(CALL_INFO, 16, VANADIS_OS_DBG_SYSCALL, "[syscall-exit] %s() called on thr=%d \n",__func__,m_process->gettid() );
 
     setReturnExited();
 }

@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -79,7 +79,9 @@ OperatingSystem::OperatingSystem(SST::ComponentId_t id, SST::Params& params, Nod
     active_os_.resize(num_ranks.thread);
   }
 
-  my_addr_ = node_ ? node_->addr() : 0;
+  my_addr_ = node_->addr();
+  next_outgoing_id_.src_node = my_addr_;
+  next_outgoing_id_.msg_num = 0;
   //auto os_params = params.get_scoped_params("operating_system");
   //params.print_all_params(std::cerr);
   unsigned int verbose = params.find<unsigned int>("verbose",0);

@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -173,11 +173,14 @@ bool Cache::clockTick(Cycle_t time) {
         if (accepted != maxRequestsPerCycle_ && processEvent(prefetchBuffer_.front(), false)) {
             accepted++;
             // Accepted prefetches are profiled in the coherence manager
+	    prefetchBuffer_.pop();
         } else {
             statPrefetchDrop->addData(1);
             coherenceMgr_->removeRequestRecord(prefetchBuffer_.front()->getID());
+	    MemEventBase* ev = prefetchBuffer_.front();
+	    prefetchBuffer_.pop();
+	    delete ev;
         }
-        prefetchBuffer_.pop();
     }
 
     // Push any events that need to be retried next cycle onto the retry buffer

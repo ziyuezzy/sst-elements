@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -148,6 +148,7 @@ private:
 
     virtual void init(unsigned int phase);
     void setup();
+    void finish();
     void handleIncomingSyscall(SST::Event* ev);
     VanadisSyscall* handleIncomingSyscall( OS::ProcessInfo*, VanadisSyscallEvent*, SST::Link* core_link );
     void processSyscallPost( VanadisSyscall* syscall );
@@ -205,7 +206,7 @@ private:
 
     void handleIncomingMemory( VanadisSyscall* syscall, StandardMem::Request* req ) {
 
-        output->verbose(CALL_INFO, 8, VANADIS_OS_DBG_SYSCALL_MEM,"\n");
+        output->verbose(CALL_INFO, 16, VANADIS_OS_DBG_SYSCALL,"handleIncomingMemory\n");
         syscall->handleMemRespBase( req );
 
         processSyscallPost( syscall ); 
@@ -248,6 +249,14 @@ private:
         void clearSyscall( ) { assert(m_syscall); m_syscall = nullptr; }
         OS::ProcessInfo* getProcess() { return m_processInfo; }
         VanadisSyscall* getSyscall() { return m_syscall; }
+        void checkpoint( FILE* fp ) {
+            if ( m_processInfo ) {
+                fprintf(fp,"pid,tid: %d,%d\n",m_processInfo->getpid(),m_processInfo->gettid());
+            } else {
+                fprintf(fp,"pid,tid: %d,%d\n",-1,-1);
+            }
+            assert( nullptr == m_syscall );
+        }
       private:
         OS::ProcessInfo* m_processInfo;
         VanadisSyscall* m_syscall;
@@ -262,6 +271,16 @@ private:
 
         OS::ProcessInfo* getProcess( unsigned hwThread ) { return m_hwThreadMap.at(hwThread).getProcess(); }
         VanadisSyscall* getSyscall( unsigned hwThread ) { return m_hwThreadMap.at(hwThread).getSyscall(); }
+
+        void checkpoint( FILE* fp ) {
+            fprintf(fp, "m_hwThreadMap.size(): %zu\n",m_hwThreadMap.size());
+            for ( auto i = 0; i < m_hwThreadMap.size(); i++ ) {
+                fprintf(fp, "hwThread: %d\n",i);
+                m_hwThreadMap[i].checkpoint( fp );
+            }
+        }
+        void checkpointLoad( FILE* fp ) {
+        }
       private:
         std::vector< HardwareThreadInfo > m_hwThreadMap;
     };
@@ -375,6 +394,13 @@ private:
         output->verbose(CALL_INFO, 1, VANADIS_OS_DBG_PAGE_FAULT,"ppn=%d\n",page->getPPN());
         return page;
     }
+
+    std::string m_checkpointDir;
+    enum { NO_CHECKPOINT, CHECKPOINT_LOAD, CHECKPOINT_SAVE }  m_checkpoint;
+
+    void checkpoint( std::string dir );
+    int checkpointLoad( std::string dir );
+    std::deque<uint64_t> m_flushPages;
 };
 
 } // namespace Vanadis

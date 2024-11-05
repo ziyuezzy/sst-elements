@@ -1,8 +1,8 @@
-// Copyright 2013-2023 NTESS. Under the terms
+// Copyright 2013-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2013-2023, NTESS
+// Copyright (c) 2013-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -209,6 +209,7 @@ void LinkControl::init(unsigned int phase)
             in_ret_credits[i] = inbuf_size.getRoundedValue() /flit_size;
         }
 
+        delete ev;
         init_state = 2;
         break;
     }
@@ -218,6 +219,7 @@ void LinkControl::init(unsigned int phase)
         if ( NULL == ev ) break;
         init_ev = static_cast<NocInitEvent*>(ev);
         id = init_ev->int_value;
+	delete ev;
 
         // Send credit event to router
         credit_event* cr_ev = new credit_event(0,inbuf_size.getRoundedValue() / flit_size);

@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -56,7 +56,7 @@ nic::nic(ComponentId_t cid, Params& params) :
 
     num_msg = params.find<int>("num_messages",10);
 
-    send_untimed_bcast = params.find<bool>("send_untimed_data","false");
+    send_untimed_bcast = params.find<bool>("send_untimed_bcast","false");
 
     UnitAlgebra message_size = params.find<std::string>("message_size","64b");
     if ( message_size.hasUnits("B") ) message_size  *= UnitAlgebra("8b/B");

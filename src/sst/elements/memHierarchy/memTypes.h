@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -229,7 +229,7 @@ static const std::string NONE = "None";
 enum class MemEventStatus { OK, Stall, Reject };
 
 /* Define an address region by start/end & interleaving */
-class MemRegion : public SST::Core::Serialization::serializable, SST::Core::Serialization::serializable_type<MemRegion> {
+class MemRegion : public SST::Core::Serialization::serializable {
 public:
     SST::MemHierarchy::Addr start;             // First address that is part of the region
     SST::MemHierarchy::Addr end;               // Last address that is part of the region

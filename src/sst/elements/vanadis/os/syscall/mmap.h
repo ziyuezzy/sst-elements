@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -84,7 +84,7 @@ public:
         uint64_t length = event->getAllocationLength();
         int64_t protect = event->getProtectionFlags();
         int64_t flags = event->getAllocationFlags();
-        m_output->verbose(CALL_INFO, 3, VANADIS_OS_DBG_SYSCALL, "[syscall-mmap] fd=%d offset=%" PRIu32 "\n", tmp[0],tmp[1]);
+        m_output->verbose(CALL_INFO, 16, VANADIS_OS_DBG_SYSCALL, "mmap memReqIsDone [syscall-mmap] fd=%d offset=%" PRIu32 "\n", tmp[0],tmp[1]);
 
         mmap( address, length, protect, flags, tmp[0], tmp[1] );
     }

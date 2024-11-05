@@ -1,5 +1,5 @@
 /**
-Copyright 2009-2023 National Technology and Engineering Solutions of Sandia,
+Copyright 2009-2024 National Technology and Engineering Solutions of Sandia,
 LLC (NTESS).  Under the terms of Contract DE-NA-0003525, the U.S. Government
 retains certain rights in this software.
 
@@ -8,7 +8,7 @@ by National Technology and Engineering Solutions of Sandia, LLC., a wholly
 owned subsidiary of Honeywell International, Inc., for the U.S. Department of
 Energy's National Nuclear Security Administration under contract DE-NA0003525.
 
-Copyright (c) 2009-2023, NTESS
+Copyright (c) 2009-2024, NTESS
 
 All rights reserved.
 
@@ -56,10 +56,6 @@ namespace SST::Iris::sumi {
 class AllgatherCollective : public DagCollective
 {
  public:
-//FIXME
-//  SPKT_DECLARE_BASE(AllgatherCollective)
-//  SPKT_DECLARE_CTOR(CollectiveEngine*, void*, void*,
-//                    int, int, int, int, Communicator*)
 
  protected:
   AllgatherCollective(CollectiveEngine* engine, void* dst, void* src,
@@ -111,13 +107,6 @@ class BruckAllgatherCollective :
   public AllgatherCollective
 {
  public:
-//FIXME
-//  SPKT_REGISTER_DERIVED(
-//    AllgatherCollective,
-//    BruckAllgatherCollective,
-//    "macro",
-//    "bruck",
-//    "Bruck log(N) allgather collective")
 
   BruckAllgatherCollective(CollectiveEngine* engine, void* dst, void* src,
                   int nelems, int type_size, int tag, int cq_id, Communicator* comm)
@@ -184,13 +173,6 @@ class RingAllgatherCollective :
   public AllgatherCollective
 {
  public:
-//FIXME
-//  SPKT_REGISTER_DERIVED(
-//    AllgatherCollective,
-//    RingAllgatherCollective,
-//    "macro",
-//    "ring",
-//    "O(N) ring allgather collective")
 
   RingAllgatherCollective(CollectiveEngine* engine, void* dst, void* src,
                           int nelems, int type_size, int tag, int cq_id, Communicator* comm)

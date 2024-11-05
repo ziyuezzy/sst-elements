@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -25,6 +25,7 @@
 namespace SST {
 namespace Vanadis {
 
+
 template<bool SetFRM, bool SetFFLAGS>
 class VanadisFPFlagsSetImmInstruction : public VanadisFloatingPointInstruction
 {
@@ -32,6 +33,8 @@ public:
     VanadisFPFlagsSetImmInstruction(
         const uint64_t addr, const uint32_t hw_thr, const VanadisDecoderOptions* isa_opts,
         VanadisFloatingPointFlags* fpflags, const uint64_t imm, int mode) :
+        VanadisInstruction(
+            addr, hw_thr, isa_opts, 0, 0, 0, 0, 0, 0, 0, 0),
         VanadisFloatingPointInstruction(
             addr, hw_thr, isa_opts, fpflags, 0, 0, 0, 0, 0, 0, 0, 0),
 			   imm_value(imm), mode(mode)
@@ -51,15 +54,28 @@ public:
 					getInstCode(), imm_value);
     }
 
-    void execute(SST::Output* output, VanadisRegisterFile* regFile) override
+    void log(SST::Output* output, int verboselevel, uint16_t sw_thr)
+    {
+        if(output->getVerboseLevel() >= verboselevel) {
+				output->verbose(CALL_INFO, verboselevel, 0, "hw_thr=%d sw_thr = %d Execute: 0x%" PRI_ADDR " %s FPFLAGS <- mask = %" PRIu64 " (0x%" PRI_ADDR ")\n",
+					getHWThread(),sw_thr, getInstructionAddress(), getInstCode(), imm_value, imm_value);
+			}
+    }
+
+
+
+
+    void instOp()
+    {
+			updateFP_flags<SetFRM,SetFFLAGS>( imm_value, mode );
+    }
+
+    void scalarExecute(SST::Output* output, VanadisRegisterFile* regFile) override
     {
 		if(checkFrontOfROB()) {
-			if(output->getVerboseLevel() >= 16) {
-				output->verbose(CALL_INFO, 16, 0, "Execute: 0x%" PRI_ADDR " %s FPFLAGS <- mask = %" PRIu64 " (0x%" PRI_ADDR ")\n",
-					getInstructionAddress(), getInstCode(), imm_value, imm_value);
-			}
+			log(output, 16, 65535);
 
-			updateFP_flags<SetFRM,SetFFLAGS>( imm_value, mode );
+			instOp();
             
 			markExecuted();
 		}

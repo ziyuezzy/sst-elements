@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -28,7 +28,7 @@ class ProcessInfo;
 
 class ThreadGrp {
 public:
-    size_t size() { return m_numThreads; }
+    size_t size() { return m_group.size(); } 
 
     void add( ProcessInfo* thread, int tid ) {
 
@@ -36,15 +36,12 @@ public:
             assert( m_group[tid] == nullptr );
         }
 
-        m_group[tid] = thread ;
-        ++m_numThreads;
+        m_group[tid] = thread;
     }
 
     void remove( int tid ) {
         assert ( m_group.find( tid ) != m_group.end() );
-        m_group[tid] = nullptr;
-
-        --m_numThreads;
+        m_group.erase(tid);
     }
 
     std::map<int,ProcessInfo*>& getThreadList() {
@@ -53,7 +50,6 @@ public:
 
 private:
     std::map<int,ProcessInfo*> m_group;
-    size_t m_numThreads;
 };
 
 }

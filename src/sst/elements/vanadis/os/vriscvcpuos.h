@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -105,6 +105,7 @@
 #define VANADIS_SYSCALL_RISCV64_MADVISE 233
 #define VANADIS_SYSCALL_RISCV64_PRLIMIT 261
 #define VANADIS_SYSCALL_RISCV64_GETRANDOM 278
+#define VANADIS_SYSCALL_RISCV64_CHECKPOINT 500 
 
 #define VANADIS_SYSCALL_RISCV_RET_REG 10
 
@@ -134,9 +135,15 @@ public:
         InstallRISCV64FuncPtr( GETRANDOM );
         InstallRISCV64FuncPtr( FSTATAT );
         InstallRISCV64FuncPtr( LSEEK );
+        InstallRISCV64FuncPtr( CHECKPOINT );
     }
 
     virtual ~VanadisRISCV64OSHandler2() {}
+
+    VanadisSyscallEvent* CHECKPOINT( int hw_thr ) {
+        output->verbose(CALL_INFO, 8, 0, "checkpoint()\n");
+        return new VanadisSyscallCheckpointEvent(core_id, hw_thr, VanadisOSBitType::VANADIS_OS_64B );
+    }
 
     VanadisSyscallEvent* CLONE( int hw_thr ) {
         uint64_t flags          = getArgRegister(0);
@@ -312,7 +319,7 @@ public:
     void recvSyscallResp( VanadisSyscallResponse* os_resp ) {
         output->verbose(CALL_INFO, 8, 0, "return-code: %" PRId64 " (success: %3s)\n",
                             os_resp->getReturnCode(), os_resp->isSuccessful() ? "yes" : "no");
-        output->verbose(CALL_INFO, 9, 0, "issuing call-backs to clear syscall ROB stops...\n");
+        output->verbose(CALL_INFO, 8, 0, "issuing call-backs to clear syscall ROB stops...\n");
 
         // Set up the return code (according to ABI, this goes in r10)
         const uint16_t rc_reg = isaTable->getIntPhysReg( VANADIS_SYSCALL_RISCV_RET_REG );

@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -30,6 +30,7 @@
 
 #include "os/vgetthreadstate.h"
 #include "os/vdumpregsreq.h"
+#include "os/vcheckpointreq.h"
 
 #include <array>
 #include <limits>
@@ -39,6 +40,7 @@
 #include <sst/core/link.h>
 #include <sst/core/output.h>
 #include <sst/core/params.h>
+
 
 namespace SST {
 namespace Vanadis {
@@ -147,7 +149,8 @@ public:
         { "print_int_reg", "Print integer registers true/false, auto set to true if verbose > 16", "false" },
         { "print_fp_reg", "Print floating-point registers true/false, auto set to "
                           "true if verbose > 16", "false" },
-        { "print_rob", "Print reorder buffer state during issue and retire", "true"} )
+        { "print_rob", "Print reorder buffer state during issue and retire", "true"},
+        { "enable_simt", "Implement SIMT pipeline for multithread kernels", "false"}  )
 
     SST_ELI_DOCUMENT_STATISTICS(
         { "cycles", "Number of cycles the core executed", "cycles", 1 },
@@ -199,6 +202,7 @@ public:
 
     void handleMisspeculate(const uint32_t hw_thr, const uint64_t new_ip);
     void clearROBMisspeculate(const uint32_t hw_thr);
+    
     void clearFuncUnit(const uint32_t hw_thr, std::vector<VanadisFunctionalUnit*>& unit);
 
     void syscallReturn(uint32_t thr);
@@ -235,6 +239,10 @@ private:
     int recoverRetiredRegisters(
         VanadisInstruction* ins, VanadisRegisterStack* int_regs, VanadisRegisterStack* fp_regs,
         VanadisISATable* issue_isa_table, VanadisISATable* retire_isa_table);
+    
+    int recoverRetiredRegisters(
+        VanadisInstruction* ins, VanadisRegisterStack* int_regs, VanadisRegisterStack* fp_regs,
+        VanadisISATable* issue_isa_table, VanadisISATable* retire_isa_table, uint16_t sw_thr);
 
     int  performFetch(const uint64_t cycle);
     int  performDecode(const uint64_t cycle);
@@ -244,7 +252,7 @@ private:
     int  allocateFunctionalUnit(VanadisInstruction* ins);
     bool mapInstructiontoFunctionalUnit(VanadisInstruction* ins, std::vector<VanadisFunctionalUnit*>& functional_units);
     void printRob(int rob_num, VanadisCircularQueue<VanadisInstruction*>* rob);
-
+    
     bool checkVerboseAddr( uint64_t addr ) {
         for ( auto& it : start_verbose_when_issue_address ) {
             if ( it == addr ) return true;
@@ -285,6 +293,7 @@ private:
     uint32_t m_curIssueHwThread;
 
     std::vector<VanadisCircularQueue<VanadisInstruction*>*> rob;
+    std::vector<VanadisCircularQueue<VanadisInstruction*>*> v_warp_rob;
     std::vector<VanadisDecoder*>                            thread_decoders;
     std::vector<const VanadisDecoderOptions*>               isa_options;
 
@@ -317,6 +326,7 @@ private:
     bool  print_issue_tables;
     bool  print_retire_tables;
     bool  print_rob;
+    bool enable_simt; //for future use
 
     char*    instPrintBuffer;
     uint64_t nextInsID;
@@ -351,8 +361,15 @@ private:
     uint64_t stop_verbose_when_retire_address;
 
     std::vector<VanadisFloatingPointFlags*> fp_flags;
+    std::vector<VanadisStartThreadCloneReq*> cloneReqs;
 
     SST::Link* os_link;
+
+    bool* m_checkpointing;
+    std::string m_checkpointDir;
+    enum { NO_CHECKPOINT, CHECKPOINT_LOAD, CHECKPOINT_SAVE } m_checkpoint;
+    void checkpoint(FILE*);
+    void checkpointLoad(FILE*);
 };
 
 } // namespace Vanadis

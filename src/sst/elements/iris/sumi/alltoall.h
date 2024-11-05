@@ -1,5 +1,5 @@
 /**
-Copyright 2009-2023 National Technology and Engineering Solutions of Sandia,
+Copyright 2009-2024 National Technology and Engineering Solutions of Sandia,
 LLC (NTESS).  Under the terms of Contract DE-NA-0003525, the U.S. Government
 retains certain rights in this software.
 
@@ -8,7 +8,7 @@ by National Technology and Engineering Solutions of Sandia, LLC., a wholly
 owned subsidiary of Honeywell International, Inc., for the U.S. Department of
 Energy's National Nuclear Security Administration under contract DE-NA0003525.
 
-Copyright (c) 2009-2023, NTESS
+Copyright (c) 2009-2024, NTESS
 
 All rights reserved.
 
@@ -48,17 +48,12 @@ Questions? Contact sst-macro-help@sandia.gov
 #include <iris/sumi/collective_actor.h>
 #include <iris/sumi/collective_message.h>
 #include <iris/sumi/comm_functions.h>
-//#include <mercury/common/factory.h>
 #include <sst/core/eli/elementbuilder.h>
 
 namespace SST::Iris::sumi {
 
 class AllToAllCollective : public DagCollective {
  public:
-//FIXME
-//  SPKT_DECLARE_BASE(AllToAllCollective)
-//  SPKT_DECLARE_CTOR(CollectiveEngine*, void*, void*,
-//                    int, int, int, int, Communicator*)
 
   AllToAllCollective(CollectiveEngine* engine, void* dst, void* src,
                      int nelems, int type_size, int tag, int cq_id,
@@ -107,13 +102,6 @@ class BruckAlltoallCollective :
   public AllToAllCollective
 {
  public:
-//FIXME
-//  SPKT_REGISTER_DERIVED(
-//    AllToAllCollective,
-//    BruckAlltoallCollective,
-//    "macro",
-//    "bruck",
-//    "Bruck log(N) all-to-all collective")
 
   BruckAlltoallCollective(CollectiveEngine* engine, void* dst, void* src,
                             int nelems, int type_size, int tag, int cq_id, Communicator* comm)
@@ -173,13 +161,6 @@ class DirectAlltoallCollective :
   public AllToAllCollective
 {
  public:
-//FIXME
-//  SPKT_REGISTER_DERIVED(
-//    AllToAllCollective,
-//    DirectAlltoallCollective,
-//    "macro",
-//    "direct",
-//    "direct all-to-all collective")
 
     DirectAlltoallCollective(CollectiveEngine* engine, void *dst, void *src, int nelems,
                               int type_size, int tag, int cq_id, Communicator* comm) :

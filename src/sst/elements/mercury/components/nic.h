@@ -1,5 +1,5 @@
 /**
-Copyright 2009-2023 National Technology and Engineering Solutions of Sandia,
+Copyright 2009-2024 National Technology and Engineering Solutions of Sandia,
 LLC (NTESS).  Under the terms of Contract DE-NA-0003525, the U.S. Government
 retains certain rights in this software.
 
@@ -8,7 +8,7 @@ by National Technology and Engineering Solutions of Sandia, LLC., a wholly
 owned subsidiary of Honeywell International, Inc., for the U.S. Department of
 Energy's National Nuclear Security Administration under contract DE-NA0003525.
 
-Copyright (c) 2009-2023, NTESS
+Copyright (c) 2009-2024, NTESS
 
 All rights reserved.
 
@@ -44,8 +44,11 @@ Questions? Contact sst-macro-help@sandia.gov
 
 #pragma once
 
-#include <mercury/common/component.h>
 #include <sst/core/event.h>
+#include <sst/core/eli/elementbuilder.h>
+#include <sst/core/interfaces/simpleNetwork.h>
+
+#include <mercury/common/component.h>
 #include <mercury/common/thread_safe_new.h>
 #include <mercury/common/node_address.h>
 #include <mercury/common/timestamp.h>
@@ -65,10 +68,8 @@ Questions? Contact sst-macro-help@sandia.gov
 //#include <sstmac/hardware/topology/topology_fwd.h>
 //#include <sprockit/debug.h>
 //#include <mercury/common/factory.h>
-#include <sst/core/eli/elementbuilder.h>
 #include <mercury/common/event_handler.h>
 #include <mercury/hardware/network/network_message.h>
-#include <sst/core/interfaces/simpleNetwork.h>
 
 #include <vector>
 #include <queue>
@@ -124,34 +125,37 @@ class NIC : public SST::Hg::SubComponent
     SST::Hg::NIC
   )
 
-//  SST_ELI_DOCUMENT_SUBCOMPONENT_SLOTS(
-//      {"link_control_slot", "Slot for a link control", "SST::Interfaces::SimpleNetwork" }
-//  )
-
   typedef enum {
     Injection,
     LogP
   } Port;
 
-  struct MyRequest : public SST::Interfaces::SimpleNetwork::Request {
+  // struct MyRequest : public SST::Interfaces::SimpleNetwork::Request {
+  //   uint64_t flow_id;
+  //   Timestamp start;
+  // };
+
+  class FlowTracker : public Event {
+private:
     uint64_t flow_id;
-    Timestamp start;
+public:
+    FlowTracker(uint64_t id) : flow_id(id) {}
+    uint64_t id() const {return flow_id;}
   };
 
-  struct MessageEvent : public Event {
-    NotSerializable(MessageEvent)
-    MessageEvent(NetworkMessage* msg) :
-      msg_(msg)
-    {
-    }
-
-    NetworkMessage* msg() const {
-      return msg_;
-    }
-
-   private:
-    NetworkMessage*  msg_;
-  };
+//  struct MessageEvent : public Event {
+//    MessageEvent(NetworkMessage* msg) :
+//      msg_(msg)
+//    {
+//    }
+//
+//    NetworkMessage* msg() const {
+//      return msg_;
+//    }
+//
+//   private:
+//    NetworkMessage*  msg_;
+//  };
 
 private:
   struct Pending {

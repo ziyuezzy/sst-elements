@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -18,6 +18,8 @@
 
 #include <math.h>
 #include <sys/mman.h>
+//#include <iostream>
+//#include <fstream>
 
 #include "sst/elements/mmu/mmu.h"
 
@@ -126,6 +128,88 @@ class ProcessInfo {
         printRegions("after text/bss setup");
     }
 
+    ProcessInfo( SST::Output* output, std::string checkpointDir,
+        MMU_Lib::MMU* mmu, PhysMemManager* physMemMgr, int node, unsigned pid, VanadisELFInfo* elfInfo, int debug_level, unsigned pageSize )
+        : m_mmu(mmu), m_physMemMgr(physMemMgr), m_pid(pid), m_pgid(pid), m_tid(pid), m_elfInfo(elfInfo), m_pageSize(pageSize)
+    {
+        std::stringstream filename;
+        filename << checkpointDir << "/process-"  << getpid();
+
+        output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"Checkpoint load process %d %s\n",getpid(), filename.str().c_str());
+
+        auto fp = fopen(filename.str().c_str(),"r");
+        assert(fp);
+
+        m_pageShift = log2(m_pageSize);
+
+        int val;
+        assert( 1 == fscanf(fp,"m_pageSize: %d\n",&val) );
+        assert( val == m_pageSize );
+        output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"m_pageSize: %d\n",m_pageSize);
+
+        assert( 1 == fscanf(fp,"m_pid: %d\n",&val) );
+        assert( val == m_pid ); 
+        output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"m_pid: %d\n",m_pid);
+
+        assert( 1 == fscanf(fp,"m_tid: %d\n",&val) );
+        assert( val == m_tid ); 
+        output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"m_tid: %d\n",m_tid);
+
+        assert( 1 == fscanf(fp,"m_ppid: %d\n", &m_ppid) );
+        output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"m_ppid: %d\n", m_ppid);
+
+        assert( 1 == fscanf(fp,"m_pgid: %d\n", &val) );
+        assert( val == m_pgid ); 
+        output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"m_pgid: %d\n", m_pgid);
+
+        assert( 1 == fscanf(fp,"m_uid: %d\n",&m_uid) );
+        output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"m_uid: %d\n",m_uid);
+
+        assert( 1 == fscanf(fp,"m_gid: %d\n",&m_gid) );
+        output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"m_gid: %d\n",m_gid);
+
+        assert( 1 == fscanf(fp,"m_core: %d\n",&m_core) );
+        output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"m_core: %d\n",m_core);
+
+        assert( 1 == fscanf(fp,"m_hwThread: %d\n",&m_hwThread) );
+        output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"m_hwThread: %d\n",m_hwThread);
+
+        assert( 1 == fscanf(fp,"m_tidAddress: %" PRIx64 "\n",&m_tidAddress) );
+        output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"m_tidAddress: %#" PRIx64 "\n",m_tidAddress);
+
+        m_virtMemMap = new VirtMemMap(output,fp,physMemMgr,elfInfo);
+        m_fileTable = new FileDescriptorTable(output,fp);
+        
+        m_threadGrp = new ThreadGrp;
+        m_futex = new Futex;
+        
+        size_t size;
+        assert( 1 == fscanf(fp,"m_params.size() %zu\n",&size) );
+        output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"m_params.size() %zu\n",size);
+
+        char* tmp = nullptr;
+        size_t num = 0;
+        getline( &tmp, &num, fp );
+        output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"%s",tmp);
+        assert( 0 == strcmp(tmp,"Local params:\n") );
+        free(tmp);
+
+        for ( auto i = 0; i < size; i++ ) {
+            char tmp1[80],tmp2[80];
+            fscanf(fp, "%s %s\n", tmp1, tmp2 );
+            std::string key = tmp1;
+            key.erase( key.size() - 1, 1 ); 
+            std::string value = tmp2;
+            auto pos1 = key.find_first_of('=' ) + 1; 
+            auto pos2 = value.find_first_of('=' ) + 1; 
+            output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"%s %s\n",key.c_str(),value.c_str());
+            m_params.insert(key.substr(pos1).c_str(),value.substr(pos2).c_str());
+        }
+    #if 0
+        m_params.print_all_params( std::cout );
+    #endif
+    }
+
     ~ProcessInfo() {
         m_threadGrp->remove( this->gettid() );
         if ( 0 == numThreads() ) {
@@ -141,6 +225,49 @@ class ProcessInfo {
         if ( 0 == m_fileTable->refCnt() ) {
             delete m_fileTable;
         }
+    }
+
+    void checkpoint( SST::Output* output, std::string checkpointDir ) {
+        std::stringstream filename;
+        filename << checkpointDir << "/process-"  << getpid();
+
+        output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"dump process %d %s\n",getpid(), filename.str().c_str());
+
+        auto fp = fopen(filename.str().c_str(),"w+");
+        assert(fp);
+        fprintf(fp,"m_pageSize: %d\n",m_pageSize);
+        fprintf(fp,"m_pid: %d\n",m_pid);
+        fprintf(fp,"m_tid: %d\n",m_tid);
+        fprintf(fp,"m_ppid: %d\n", m_ppid);
+        fprintf(fp,"m_pgid: %d\n", m_pgid);
+        fprintf(fp,"m_uid: %d\n",m_uid);
+        fprintf(fp,"m_gid: %d\n",m_gid);
+        fprintf(fp,"m_core: %d\n",m_core);
+        fprintf(fp,"m_hwThread: %d\n",m_hwThread);
+        fprintf(fp,"m_tidAddress: %#llx\n",m_tidAddress);
+
+        m_virtMemMap->checkpoint(fp);
+        m_fileTable->checkpoint(fp);
+
+        #if 0
+        fprintf(fp,"#ThreadGrp start\n");
+
+        auto tmp = m_threadGrp->getThreadList(); 
+        
+        fprintf(fp,"m_group.size(): %zu\n",tmp.size());
+        for ( auto & x : tmp ) {
+            fprintf(fp,"tid: %d\n", x.first );
+        }
+        fprintf(fp,"#ThreadGrp end\n");
+        #endif
+
+        assert( m_futex->isEmpty() );
+        
+        std::stringstream ss; 
+
+        fprintf(fp,"m_params.size() %zu\n",m_params.size());
+        m_params.print_all_params( ss );
+        fprintf(fp,"%s",ss.str().c_str());
     }
 
     void decRefCnts() { 
@@ -183,6 +310,11 @@ class ProcessInfo {
         return m_virtMemMap->findRegion( addr );
     }
 
+    MemoryRegion* findMemRegion( std::string name ) {
+        return m_virtMemMap->findRegion( name );
+    }
+
+
     void addFutexWait( uint64_t addr, VanadisSyscall* syscall ) {
         m_dbg.verbose(CALL_INFO,1,0,"addr=%#" PRIx64 "\n",addr);
         m_futex->addWait( addr, syscall );
@@ -199,22 +331,26 @@ class ProcessInfo {
     }
 
     void mapVirtToPage( unsigned vpn, OS::Page* page ) {
-        m_dbg.verbose(CALL_INFO,1,0,"vpn=%d ppn=%d virtAddr=%#" PRIx64 "\n", vpn, page->getPPN(), (uint64_t) vpn << m_pageShift );
+        m_dbg.verbose(CALL_INFO,1,VANADIS_OS_DBG_VIRT2PHYS,"vpn=%d ppn=%d virtAddr=%#" PRIx64 "\n", vpn, page->getPPN(), (uint64_t) vpn << m_pageShift );
         auto region = findMemRegion( vpn << m_pageShift );
         assert( region );
         region->mapVirtToPhys( vpn, page );
     }
 
     uint64_t virtToPhys( uint64_t virtAddr) {
+
         uint32_t vpn = virtAddr >> m_pageShift;
 
         auto region = findMemRegion(virtAddr);
+
         if ( nullptr == region ) {
             m_dbg.fatal(CALL_INFO, -1, "Error: can't find memory region for addr %#" PRIx64 "\n", virtAddr);
         }
-        
+
         uint32_t ppn = m_mmu->virtToPhys( getpid(), vpn );
+
         if ( -1 == ppn ) {
+
             return -1;
         }
         uint64_t physAddr = ppn << m_pageShift | virtAddr & ( (1<<m_pageShift) - 1 );
@@ -354,6 +490,7 @@ class ProcessInfo {
     FileDescriptorTable*    m_fileTable;
     ThreadGrp*              m_threadGrp;
     Futex*                  m_futex;
+    SST::Output* m_output;
 };
 
 }

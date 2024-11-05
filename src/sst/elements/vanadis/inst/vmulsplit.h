@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -62,19 +62,20 @@ public:
             phys_int_regs_out[1], phys_int_regs_in[0], phys_int_regs_in[1]);
     }
 
-    void execute(SST::Output* output, VanadisRegisterFile* regFile) override
+
+    void scalarExecute(SST::Output* output, VanadisRegisterFile* regFile) override
     {
-#ifdef VANADIS_BUILD_DEBUG
-        if(output->getVerboseLevel() >= 16) {
-            output->verbose(
-                CALL_INFO, 16, 0,
-                "Execute: (addr=%p) %s phys: out-lo: %" PRIu16 " out-hi: %" PRIu16 " in=%" PRIu16 ", %" PRIu16
-                ", isa: out-lo: %" PRIu16 " out-hi: %" PRIu16 " / in=%" PRIu16 ", %" PRIu16 "\n",
-                (void*)getInstructionAddress(), getInstCode(),
-                phys_int_regs_out[0], phys_int_regs_out[1], phys_int_regs_in[0],
-                phys_int_regs_in[1], isa_int_regs_out[0], isa_int_regs_out[1], isa_int_regs_in[0], isa_int_regs_in[1]);
-        }
-#endif
+        #ifdef VANADIS_BUILD_DEBUG
+                if(output->getVerboseLevel() >= 16) {
+                    output->verbose(
+                        CALL_INFO, 16, 0,
+                        "Execute: (addr=%p) %s phys: out-lo: %" PRIu16 " out-hi: %" PRIu16 " in=%" PRIu16 ", %" PRIu16
+                        ", isa: out-lo: %" PRIu16 " out-hi: %" PRIu16 " / in=%" PRIu16 ", %" PRIu16 "\n",
+                        (void*)getInstructionAddress(), getInstCode(),
+                        phys_int_regs_out[0], phys_int_regs_out[1], phys_int_regs_in[0],
+                        phys_int_regs_in[1], isa_int_regs_out[0], isa_int_regs_out[1], isa_int_regs_in[0], isa_int_regs_in[1]);
+                }
+        #endif
         const register_format src_1 = regFile->getIntReg<register_format>(phys_int_regs_in[0]);
         const register_format src_2 = regFile->getIntReg<register_format>(phys_int_regs_in[1]);
 
@@ -115,6 +116,8 @@ public:
 
         markExecuted();
     }
+
+
 };
 
 } // namespace Vanadis

@@ -1,8 +1,8 @@
-// Copyright 2013-2023 NTESS. Under the terms
+// Copyright 2013-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2013-2023, NTESS
+// Copyright (c) 2013-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -520,7 +520,7 @@ SST::Interfaces::SimpleNetwork::Request* LinkControl::recv(int vn) {
 
 void LinkControl::sendUntimedData(SST::Interfaces::SimpleNetwork::Request* req)
 {
-    if ( use_nid_map ) {
+    if ( use_nid_map && req->dest != SimpleNetwork::INIT_BROADCAST_ADDR ) {
         req->dest = nid_map[req->dest];
     }
     rtr_link->sendUntimedData(new RtrEvent(req,id,0));

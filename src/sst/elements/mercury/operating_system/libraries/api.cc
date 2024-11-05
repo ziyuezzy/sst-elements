@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -49,18 +49,18 @@ API::~API()
 
 SST::Hg::SoftwareId
 API::sid() const {
-  return parent_->sid();
+  return api_parent_app_->sid();
 }
 
 NodeId
 API::addr() const {
-  return parent_->os()->addr();
+  return api_parent_app_->os()->addr();
 }
 
 Thread*
 API::activeThread()
 {
-  return parent_->os()->activeThread();
+  return api_parent_app_->os()->activeThread();
 }
 
 void
@@ -76,7 +76,7 @@ API::endAPICall()
 {
 //  if (host_timer_) {
 //    double time = host_timer_->stamp();
-//    parent_->compute(TimeDelta(time));
+//    api_parent_app_->compute(TimeDelta(time));
 //  }
   activeThread()->endAPICall();
 }
@@ -84,23 +84,23 @@ API::endAPICall()
 Timestamp
 API::now() const 
 {
-  return parent_->os()->now();
+  return api_parent_app_->os()->now();
 }
 
 void
 API::schedule(Timestamp t, ExecutionEvent* ev)
 {
-  parent_->os()->sendExecutionEvent(t, ev);
+  api_parent_app_->os()->sendExecutionEvent(t, ev);
 }
 
 void
 API::scheduleDelay(TimeDelta t, ExecutionEvent* ev)
 {
-  parent_->os()->sendDelayedExecutionEvent(t, ev);
+  api_parent_app_->os()->sendDelayedExecutionEvent(t, ev);
 }
 
-API::API(SST::Params & /*params*/, App *parent, SST::Component*  /*comp*/) :
-  parent_(parent)
+API::API(SST::Params & /*params*/, App *parent, SST::Component*) :
+  api_parent_app_(parent)
 { }
 
 } // end namespace Hg

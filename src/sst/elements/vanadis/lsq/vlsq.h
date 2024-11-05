@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -30,8 +30,8 @@
 #include <vector>
 #include <queue>
 
-#define VANADIS_DBG_LSQ_STORE_FLG  (1<<0)
-#define VANADIS_DBG_LSQ_LOAD_FLG  (1<<1)
+#define VANADIS_DBG_LSQ_STORE_FLG 0 // (1<<0)
+#define VANADIS_DBG_LSQ_LOAD_FLG  0 //(1<<1)
 
 namespace SST {
 namespace Vanadis {

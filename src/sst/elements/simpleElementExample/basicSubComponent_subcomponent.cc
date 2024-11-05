@@ -1,8 +1,8 @@
-// Copyright 2009-2023 NTESS. Under the terms
+// Copyright 2009-2024 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2023, NTESS
+// Copyright (c) 2009-2024, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -48,6 +48,13 @@ std::string basicSubComponentIncrement::compute ( std::string comp )
 {
     return "(" + comp + ")" + " + " + std::to_string(amount);
 }
+
+void basicSubComponentIncrement::serialize_order(SST::Core::Serialization::serializer& ser) {
+    SubComponent::serialize_order(ser);
+
+    SST_SER(amount);
+}
+
 /***********************************************************************************/
 // basicSubComponentDecrement
 
@@ -68,6 +75,13 @@ std::string basicSubComponentDecrement::compute ( std::string comp )
 {
     return "(" + comp + ")" + " - " + std::to_string(amount);
 }
+
+void basicSubComponentDecrement::serialize_order(SST::Core::Serialization::serializer& ser) {
+    SubComponent::serialize_order(ser);
+
+    SST_SER(amount);
+}
+
 /***********************************************************************************/
 // basicSubComponentMultiply
 
@@ -88,6 +102,13 @@ std::string basicSubComponentMultiply::compute ( std::string comp )
 {
     return "(" + comp + ")" + " * " + std::to_string(amount);
 }
+
+void basicSubComponentMultiply::serialize_order(SST::Core::Serialization::serializer& ser) {
+    SubComponent::serialize_order(ser);
+
+    SST_SER(amount);
+}
+
 /***********************************************************************************/
 // basicSubComponentDivide
 
@@ -111,4 +132,10 @@ int basicSubComponentDivide::compute( int num )
 std::string basicSubComponentDivide::compute ( std::string comp )
 {
     return "(" + comp + ")" + " / " + std::to_string(amount);
+}
+
+void basicSubComponentDivide::serialize_order(SST::Core::Serialization::serializer& ser) {
+    SubComponent::serialize_order(ser);
+
+    SST_SER(amount);
 }
