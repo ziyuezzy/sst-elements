@@ -613,7 +613,7 @@ void topo_from_graph::route_ugal_precise(int port, int vc, internal_router_event
             assert(vc==0);
             int queue_length = output_queue_lengths[next_port * num_vcs];
             int path_length=(temp_path.size()-1)+distance_table[std::make_pair(intermidiate_router, dest_router)];
-            possible_paths[temp_path]=path_length*queue_length+1;//the +1 is to break tie against shortest path
+            possible_paths[temp_path]=path_length*queue_length+50; //the +50 is to break tie against shortest path, and to paneltize long valiant paths
         }
         
         // add shortest paths and calculate costs
@@ -740,7 +740,7 @@ void topo_from_graph::route_ugal_threshold(int port, int vc, internal_router_eve
             int next_port=connectivity[next_router];
             int queue_length = output_queue_lengths[next_port * num_vcs + vc];
             // assume the second valiant path has max_path_length, in order to calculate the cost
-            possible_paths[temp_path]= 2*queue_length + 50; // the '+1' is for breaking draw with minimal paths, therefore minimal paths are prior to be chosen
+            possible_paths[temp_path]= 2*queue_length + 50; //the +50 is to break tie against shortest path, and to paneltize long valiant path. (same implementation in booksim2)
         }
         
         // add shortest paths and calculate costs
