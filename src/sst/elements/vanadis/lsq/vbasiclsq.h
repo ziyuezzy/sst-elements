@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -81,8 +81,7 @@ class VanadisBasicLoadStoreQueue : public SST::Vanadis::VanadisLoadStoreQueue
 
             memInterface = loadUserSubComponent<Interfaces::StandardMem>(
                 "memory_interface", ComponentInfo::SHARE_PORTS | ComponentInfo::INSERT_STATS, getTimeConverter("1ps"),
-                new StandardMem::Handler<SST::Vanadis::VanadisBasicLoadStoreQueue>(
-                    this, &VanadisBasicLoadStoreQueue::processIncomingDataCacheEvent));
+                new StandardMem::Handler2<SST::Vanadis::VanadisBasicLoadStoreQueue,&VanadisBasicLoadStoreQueue::processIncomingDataCacheEvent>(this));
 
             address_mask = params.find<uint64_t>("address_mask", 0xFFFFFFFFFFFFFFFFULL);
 
@@ -1000,7 +999,7 @@ class VanadisBasicLoadStoreQueue : public SST::Vanadis::VanadisLoadStoreQueue
             }
             else
             {
-                if((new_pending_store==nullptr))
+                if(new_pending_store==nullptr)
                 {
                     output->fatal(CALL_INFO, -1, "Error: store process failed (ins: 0x%" PRI_ADDR ", thr: %" PRIu32 ")\n",
                         store_ins->getInstructionAddress(), store_ins->getHWThread());

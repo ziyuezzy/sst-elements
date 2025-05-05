@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -15,8 +15,8 @@
 
 #include <mercury/common/null_buffer.h>
 #include <mercury/common/errors.h>
-#include <mercury/common/serializable.h>
 #include <mercury/hardware/network/network_message.h>
+#include <sst/core/serialization/serializable.h>
 
 #define enumcase(x) case x: return #x;
 
@@ -253,33 +253,33 @@ NetworkMessage::tostr(type_t ty)
 }
 
 void
-NetworkMessage::serialize_order(serializer& ser)
+NetworkMessage::serialize_order(SST::Core::Serialization::serializer& ser)
 {
   Flow::serialize_order(ser);
 
   // Can't serialize a nullptr!
   bool wire_is_null = wire_buffer_ == nullptr;
-  ser & wire_is_null;
+  SST_SER(wire_is_null);
   if(!wire_is_null){
-    ser & SST::Hg::array(wire_buffer_, payload_bytes_);
+    SST_SER(SST::Core::Serialization::array(wire_buffer_, payload_bytes_));
   } else {
-    ser & payload_bytes_; 
+    SST_SER(payload_bytes_); 
   }
 
-  ser & time_started_;
-  ser & time_arrived_;
-  ser & injection_started_;
-  ser & aid_;
-  ser & needs_ack_;
-  ser & toaddr_;
-  ser & fromaddr_;
-  ser & type_;
-  ser & qos_;
-  ser & time_started_;
-  ser & injection_started_;
-  ser & injection_delay_;
-  ser & min_delay_;
-  ser & congestion_delay_;
+  SST_SER(time_started_);
+  SST_SER(time_arrived_);
+  SST_SER(injection_started_);
+  SST_SER(aid_);
+  SST_SER(needs_ack_);
+  SST_SER(toaddr_);
+  SST_SER(fromaddr_);
+  SST_SER(type_);
+  SST_SER(qos_);
+  SST_SER(time_started_);
+  SST_SER(injection_started_);
+  SST_SER(injection_delay_);
+  SST_SER(min_delay_);
+  SST_SER(congestion_delay_);
   if (type_ == null_netmsg_type){
     sst_hg_abort_printf("failed serializing network message - got null type");
   }

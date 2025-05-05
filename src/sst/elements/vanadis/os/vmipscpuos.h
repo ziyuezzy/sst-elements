@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -103,6 +103,7 @@
 #define VANADIS_SYSCALL_MIPS_MADVISE 4218
 #define VANADIS_SYSCALL_MIPS_GETTID 4222
 #define VANADIS_SYSCALL_MIPS_FUTEX 4238
+#define VANADIS_SYSCALL_MIPS_SCHED_SETAFFINITY 4239
 #define VANADIS_SYSCALL_MIPS_SCHED_GETAFFINITY 4240
 #define VANADIS_SYSCALL_MIPS_EXIT_GROUP 4246
 #define VANADIS_SYSCALL_MIPS_SET_TID_ADDRESS 4252
@@ -112,6 +113,8 @@
 #define VANADIS_SYSCALL_MIPS_UNLINKAT 4294
 #define VANADIS_SYSCALL_MIPS_STATX 4366
 #define VANADIS_SYSCALL_MIPS_GETTIME64 4403
+#define VANADIS_SYSCALL_MIPS_SCHED_YIELD 5023
+#define VANADIS_SYSCALL_MIPS_GETCPU 5271
 
 #define InstallMIPSFuncPtr( funcName ) Install_ISA_FuncPtr( MIPS, funcName )
 

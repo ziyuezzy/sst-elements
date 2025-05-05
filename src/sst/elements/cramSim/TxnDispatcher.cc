@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -71,7 +71,7 @@ c_TxnDispatcher::c_TxnDispatcher(ComponentId_t id, Params &params) {
 
 
     //*---- configure link ----*//
-    m_txnGenLink = configureLink("txnGen",new Event::Handler<c_TxnDispatcher>(this,&c_TxnDispatcher::handleTxnGenEvent));
+    m_txnGenLink = configureLink("txnGen",new Event::Handler2<c_TxnDispatcher,&c_TxnDispatcher::handleTxnGenEvent>(this));
     if(!l_link) {
         output->fatal(CALL_INFO, -1, "txnGen link is not found.. exit\n");
     }
@@ -81,8 +81,8 @@ c_TxnDispatcher::c_TxnDispatcher(ComponentId_t id, Params &params) {
         Link *l_link = configureLink(l_linkName);
 
         if (l_link) {
-            m_outLaneLinks.push_back(l_link,  new Event::Handler<c_TxnDispatcher>(this,
-                                                                               &c_TxnDispatcher::handleCtrlEvent));
+            m_outLaneLinks.push_back(l_link,
+                                     new Event::Handler2<c_TxnDispatcher,&c_TxnDispatcher::handleCtrlEvent>(this));
             output->output("%s is connected", l_linkName.c_str());
         } else {
             output->fatal(CALL_INFO, -1, "%s is not found.. exit\n", l_linkName.c_str());

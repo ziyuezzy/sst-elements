@@ -27,9 +27,10 @@ class testcase_prospero(SSTTestCase):
 #####
     pin_loaded = testing_is_PIN_loaded()
     pin3_used = testing_is_PIN3_used()
-    libz_missing = not sst_elements_config_include_file_get_value_int("HAVE_LIBZ", default=0, disable_warning=True)
+    libz_missing = not sst_elements_config_include_file_get_value("HAVE_LIBZ", type=int, default=0, disable_warning=True)
 
     @unittest.skipIf(libz_missing, "test_prospero_compressed_using_TAR_traces test: Requires LIBZ, but LIBZ is not found in build configuration.")
+    @unittest.skipIf(not testing_check_is_nightly(), "test_prospero_compressed_using_TAR_traces only runs on Nightly builds.")
     def test_prospero_compressed_using_TAR_traces(self):
         self.prospero_test_template("compressed", NO_TIMINGDRAM, USE_TAR_TRACES)
 
@@ -37,9 +38,11 @@ class testcase_prospero(SSTTestCase):
     def test_prospero_compressed_withtimingdram_using_TAR_traces(self):
         self.prospero_test_template("compressed", WITH_TIMINGDRAM, USE_TAR_TRACES)
 
+    @unittest.skipIf(not testing_check_is_nightly(), "test_prospero_text_using_TAR_traces only runs on Nightly builds.")
     def test_prospero_text_using_TAR_traces(self):
         self.prospero_test_template("text", NO_TIMINGDRAM, USE_TAR_TRACES)
 
+    @unittest.skipIf(not testing_check_is_nightly(), "test_prospero_binary_using_TAR_traces only runs on Nightly builds.")
     def test_prospero_binary_using_TAR_traces(self):
         self.prospero_test_template("binary", NO_TIMINGDRAM, USE_TAR_TRACES)
 
@@ -50,10 +53,12 @@ class testcase_prospero(SSTTestCase):
         self.prospero_test_template("binary", WITH_TIMINGDRAM, USE_TAR_TRACES)
 
     @unittest.skipIf(not pin_loaded, "test_prospero_text_using_PIN_traces: Requires PIN, but Env Var 'INTEL_PIN_DIR' is not found or path does not exist.")
+    @unittest.skipIf(not testing_check_is_nightly(), "test_prospero_text_using_PIN_traces only runs on Nightly builds.")
     def test_prospero_text_using_PIN_traces(self):
         self.prospero_test_template("text", NO_TIMINGDRAM, USE_PIN_TRACES)
 
     @unittest.skipIf(not pin_loaded, "test_prospero_binary_using_PIN_traces: Requires PIN, but Env Var 'INTEL_PIN_DIR' is not found or path does not exist.")
+    @unittest.skipIf(not testing_check_is_nightly(), "test_prospero_binary_using_PIN_traces only runs on Nightly builds.")
     def test_prospero_binary_using_PIN_traces(self):
         self.prospero_test_template("binary", NO_TIMINGDRAM, USE_PIN_TRACES)
 
@@ -225,7 +230,7 @@ class testcase_prospero(SSTTestCase):
         self.assertTrue(rtn.result() == 0, "array.c failed to compile")
 
         # Make sure we have access to the sst-prospero-trace binary
-        elem_bin_dir = sstsimulator_conf_get_value_str("SST_ELEMENT_LIBRARY", "SST_ELEMENT_LIBRARY_BINDIR", "BINDIR_UNDEFINED")
+        elem_bin_dir = sstsimulator_conf_get_value("SST_ELEMENT_LIBRARY", "SST_ELEMENT_LIBRARY_BINDIR", str, "BINDIR_UNDEFINED")
         log_debug("Elements bin_dir = {0}".format(elem_bin_dir))
         filepath_sst_prospero_trace_app = "{0}/sst-prospero-trace".format(elem_bin_dir)
         if os.path.isfile(filepath_sst_prospero_trace_app):

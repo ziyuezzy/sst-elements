@@ -1,10 +1,10 @@
 // -*- mode: c++ -*-
 
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -64,7 +64,7 @@ public:
         {"output_buf_size",    "Size of output buffers specified in b or B (can include SI prefix)."},
         // {"network_inspectors", "Comma separated list of network inspectors to put on output ports.", ""},
         {"job_id",             "ID of the job this enpoint is part of.", "" },
-        {"Job_size",           "Number of nodes in the job this endpoint is part of.",""},
+        {"job_size",           "Number of nodes in the job this endpoint is part of.",""},
         {"logical_nid",        "My logical NID", "" },
         {"use_nid_remap",      "If true, will remap logical nids in job to physical ids", "false" },
         {"nid_map_name",       "Base name of shared region where my NID map will be located.  If empty, no NID map will be used.",""},

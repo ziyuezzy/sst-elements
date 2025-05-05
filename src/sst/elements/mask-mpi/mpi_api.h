@@ -1,5 +1,5 @@
 /**
-Copyright 2009-2024 National Technology and Engineering Solutions of Sandia,
+Copyright 2009-2025 National Technology and Engineering Solutions of Sandia,
 LLC (NTESS).  Under the terms of Contract DE-NA-0003525, the U.S. Government
 retains certain rights in this software.
 
@@ -8,7 +8,7 @@ by National Technology and Engineering Solutions of Sandia, LLC., a wholly
 owned subsidiary of Honeywell International, Inc., for the U.S. Department of
 Energy's National Nuclear Security Administration under contract DE-NA0003525.
 
-Copyright (c) 2009-2024, NTESS
+Copyright (c) 2009-2025, NTESS
 
 All rights reserved.
 
@@ -45,8 +45,8 @@ Questions? Contact sst-macro-help@sandia.gov
 #include <sst/core/params.h>
 #include <mercury/common/factory.h>
 #include <mercury/components/operating_system_fwd.h>
+#include <mercury/operating_system/libraries/event_library.h>
 #include <mercury/operating_system/libraries/library.h>
-#include <mercury/operating_system/libraries/api.h>
 #include <mercury/operating_system/process/software_id.h>
 #include <iris/sumi/message_fwd.h>
 #include <iris/sumi/sim_transport.h>
@@ -82,14 +82,14 @@ class MpiApi : public SST::Iris::sumi::SimTransport
 //  friend class OTF2Writer;
  public:
   SST_ELI_REGISTER_DERIVED(
-    SST::Hg::API,
+    SST::Hg::Library,
     MpiApi,
     "hg",
     "MpiApi",
     SST_ELI_ELEMENT_VERSION(1,0,0),
-    "provides the MPI transport API")
+    "implements the MPI transport API")
 
-  MpiApi(SST::Params& params, SST::Hg::App* app, SST::Component* comp);
+  MpiApi(SST::Params& params, SST::Hg::App* app);
 
   static void deleteStatics();
 
@@ -823,7 +823,7 @@ class MpiApi : public SST::Iris::sumi::SimTransport
 
 //  static sstmac::FTQTag mpi_tag;
 
-  MpiCommFactory comm_factory_;
+  MpiCommFactory* comm_factory_;
 
   int iprobe_delay_us_;
   int test_delay_us_;
@@ -887,6 +887,8 @@ class MpiApi : public SST::Iris::sumi::SimTransport
 
  private:
   MPI_Call current_call_;
+  unsigned int verbose_;
+  std::unique_ptr<SST::Output> out_;
 
 };
 
@@ -897,7 +899,7 @@ MpiApi* mask_mpi();
 #define _StartMPICall_(fxn) \
   CallGraphAppend(fxn); \
   sstmac::sw::FTQScope scope(activeThread(), mpi_tag); \
-  startAPICall()
+  startLibraryCall()
 
 
 #define StartMPICall(fxn) \
@@ -906,7 +908,7 @@ MpiApi* mask_mpi();
 #define FinishMPICall(fxn) \
   mpi_api_debug(sprockit::dbg::mpi, #fxn " finished"); \
   finishCurrentMpiCall(); \
-  endAPICall()
+  endLibraryCall()
 
 #define mpi_api_debug(flags, ...) \
   mpi_debug(commWorld()->rank(), flags, __VA_ARGS__)

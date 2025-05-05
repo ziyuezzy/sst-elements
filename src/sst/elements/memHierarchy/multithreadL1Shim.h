@@ -1,8 +1,8 @@
-// Copyright 2013-2024 NTESS. Under the terms
+// Copyright 2013-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2013-2024, NTESS
+// Copyright (c) 2013-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -83,8 +83,8 @@ private:
     /** Timestamp & clock control */
     uint64_t    timestamp;
     bool        clockOn;
-    Clock::Handler<MultiThreadL1>*  clockHandler;
-    TimeConverter* clock;
+    Clock::HandlerBase* clockHandler;
+    TimeConverter       clock;
 
     /** Track outstanding requests for routing responses correctly */
     std::map<Event::id_type, unsigned int> threadRequestMap;

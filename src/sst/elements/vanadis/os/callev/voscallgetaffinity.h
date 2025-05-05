@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -13,8 +13,8 @@
 // information, see the LICENSE file in the top level directory of the
 // distribution.
 
-#ifndef _H_VANADIS_SYSCALL_SCHED_AFFINITY
-#define _H_VANADIS_SYSCALL_SCHED_AFFINITY
+#ifndef _H_VANADIS_SYSCALL_SCHED_GET_AFFINITY
+#define _H_VANADIS_SYSCALL_SCHED_GET_AFFINITY
 
 #include "os/voscallev.h"
 #include "os/vosbittype.h"
@@ -38,9 +38,9 @@ private:
 
     void serialize_order(SST::Core::Serialization::serializer& ser) override {
         VanadisSyscallEvent::serialize_order(ser);
-        ser& pid;
-        ser& cpusetsize;
-        ser& maskAddr;
+        SST_SER(pid);
+        SST_SER(cpusetsize);
+        SST_SER(maskAddr);
     }
     ImplementSerializable(SST::Vanadis::VanadisSyscallGetaffinityEvent);
 

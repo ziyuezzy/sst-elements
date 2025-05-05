@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -81,18 +81,17 @@ class ArielCPU : public SST::Component {
         {"tracegen", "Select the trace generator for Ariel (which records traced memory operations", ""},
         {"memmgr", "Memory manager to use for address translation", "ariel.MemoryManagerSimple"},
         {"writepayloadtrace", "Trace write payloads and put real memory contents into the memory system", "0"},
-        {"instrument_instructions", "turn on or off instruction instrumentation in fesimple", "1"},
-        {"gpu_enabled", "If enabled, gpu links will be set up", "0"})
+        {"instrument_instructions", "turn on or off instruction instrumentation in fesimple", "1"})
 
     SST_ELI_DOCUMENT_PORTS( {"cache_link_%(corecount)d", "Each core's link to its cache", {}},
-       {"gpu_link_%(corecount)d", "Each core's link to the GPU", {}},
        {"rtl_link_%(corecount)d", "Each core's link to the RTL", {}})
-
 
     SST_ELI_DOCUMENT_STATISTICS(
         { "read_requests",        "Statistic counts number of read requests", "requests", 1},   // Name, Desc, Enable Level
         { "write_requests",       "Statistic counts number of write requests", "requests", 1},
-        { "read_request_sizes",   "Statistic for size of read requests", "bytes", 1},   // Name, Desc, Enable Level
+        { "read_latency",         "Statistic for latency of read requests", "cycles", 1},
+        { "write_latency",        "Statistic for latency of write requests", "cycles", 1},
+        { "read_request_sizes",   "Statistic for size of read requests", "bytes", 1},
         { "write_request_sizes",  "Statistic for size of write requests", "bytes", 1},
         { "split_read_requests",  "Statistic counts number of split read requests (requests which come from multiple lines)", "requests", 1},
         { "split_write_requests", "Statistic counts number of split write requests (requests which are split over multiple lines)", "requests", 1},
@@ -132,7 +131,6 @@ class ArielCPU : public SST::Component {
 
         std::vector<ArielCore*> cpu_cores;
         std::vector<Interfaces::StandardMem*> cpu_to_cache_links;
-        std::vector<SST::Link*> cpu_to_gpu_links;
         std::vector<SST::Link*> cpu_to_rtl_links;
 
         uint32_t core_count;
@@ -140,13 +138,6 @@ class ArielCPU : public SST::Component {
         ArielFrontend* frontend;
         ArielTunnel* tunnel;
         bool stopTicking;
-
-#ifdef HAVE_CUDA
-        GpuReturnTunnel* tunnelR;
-        GpuDataTunnel* tunnelD;
-        bool gpu_enabled;
-#endif
-
 };
 
 }

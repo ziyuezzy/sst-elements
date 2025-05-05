@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -15,24 +15,27 @@
 
 #include <mercury/components/operating_system.h>
 
-#include <sst/core/params.h>
 #include <mercury/common/events.h>
 #include <mercury/common/factory.h>
-#include <sst/core/eli/elementbuilder.h>
 #include <mercury/common/request.h>
 #include <mercury/components/node.h>
+#include <mercury/components/node_CL.h>
 #include <mercury/operating_system/launch/app_launcher.h>
+#include <mercury/operating_system/libraries/unblock_event.h>
 #include <mercury/operating_system/process/app.h>
 #include <mercury/operating_system/process/thread_id.h>
 #include <mercury/operating_system/threading/stack_alloc.h>
-#include <mercury/operating_system/libraries/unblock_event.h>
+#include <sst/core/eli/elementbuilder.h>
+#include <sst/core/params.h>
 #include <stdlib.h>
 #include <sys/mman.h>
 
-extern "C" void* sst_hg_nullptr = nullptr;
-extern "C" void* sst_hg_nullptr_send = nullptr;
-extern "C" void* sst_hg_nullptr_recv = nullptr;
-extern "C" void* sst_hg_nullptr_range_max = nullptr;
+extern "C" {
+void* sst_hg_nullptr = nullptr;
+void* sst_hg_nullptr_send = nullptr;
+void* sst_hg_nullptr_recv = nullptr;
+void* sst_hg_nullptr_range_max = nullptr;
+}
 static uintptr_t sst_hg_nullptr_range = 0;
 
 namespace SST {
@@ -40,15 +43,13 @@ namespace Hg {
 
 extern template class  HgBase<SST::Component>;
 extern template class  HgBase<SST::SubComponent>;
-extern template SST::TimeConverter* HgBase<SST::SubComponent>::time_converter_;
+extern template SST::TimeConverter HgBase<SST::SubComponent>::time_converter_;
 
-//#if SST_HG_USE_MULTITHREAD
+// #if SST_HG_USE_MULTITHREAD
 std::vector<OperatingSystem*> OperatingSystem::active_os_;
-//#else
-//OperatingSystem* OperatingSystem::active_os_ = nullptr;
-//#endif
-
-//SST::TimeConverter* OperatingSystem::time_converter_ = nullptr;
+// #else
+// OperatingSystem* OperatingSystem::active_os_ = nullptr;
+// #endif
 
 class DeleteThreadEvent :
     public ExecutionEvent
@@ -67,13 +68,16 @@ protected:
   Thread* thr_;
 };
 
-OperatingSystem::OperatingSystem(SST::ComponentId_t id, SST::Params& params, Node* parent) :
-  SST::Hg::SubComponent(id),
+OperatingSystem::OperatingSystem(SST::ComponentId_t id, SST::Params& params, NodeBase* parent) :
+  OperatingSystemBase(id,params),
   node_(parent),
   des_context_(nullptr),
   next_condition_(0),
-  next_mutex_(0)
+  next_mutex_(0),
+  params_(params)
 {
+  TimeDelta::initStamps(TimeDelta::ASEC_PER_TICK);
+
   if (active_os_.size() == 0){
     RankInfo num_ranks = getNumRanks();
     active_os_.resize(num_ranks.thread);
@@ -82,44 +86,35 @@ OperatingSystem::OperatingSystem(SST::ComponentId_t id, SST::Params& params, Nod
   my_addr_ = node_->addr();
   next_outgoing_id_.src_node = my_addr_;
   next_outgoing_id_.msg_num = 0;
-  //auto os_params = params.get_scoped_params("operating_system");
-  //params.print_all_params(std::cerr);
-  unsigned int verbose = params.find<unsigned int>("verbose",0);
-  out_ = std::unique_ptr<SST::Output>(new SST::Output(sprintf("Node%d:OperatingSystem:", my_addr_), verbose, 0, Output::STDOUT));
+  verbose_ = params.find<unsigned int>("verbose", 1);
+  out_ = std::unique_ptr<SST::Output>(
+      new SST::Output(sprintf("Node%d:HgOperatingSystem:", my_addr_), verbose_, 0,
+                      Output::STDOUT));
   out_->debug(CALL_INFO, 1, 0, "constructing\n");
 
   if (sst_hg_nullptr == nullptr){
 
     int range_bit_size = 30;
-    sst_hg_nullptr_range = 1ULL<<range_bit_size;
-    sst_hg_nullptr = mmap(nullptr, sst_hg_nullptr_range,
-                          PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if (sst_hg_nullptr == ((void*)-1)){
-        sst_hg_abort_printf("address reservation failed in mmap: %s", ::strerror(errno));
+    sst_hg_nullptr_range = 1ULL << range_bit_size;
+    sst_hg_nullptr = mmap(nullptr, sst_hg_nullptr_range, PROT_NONE,
+                          MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (sst_hg_nullptr == ((void *)-1)) {
+      sst_hg_abort_printf("address reservation failed in mmap: %s",
+                          ::strerror(errno));
     }
     sst_hg_nullptr_send = sst_hg_nullptr;
     sst_hg_nullptr_recv = ((char*)sst_hg_nullptr) + (sst_hg_nullptr_range/2);
     sst_hg_nullptr_range_max = ((char*)sst_hg_nullptr) + sst_hg_nullptr_range;
   }
 
-  //eventSize = params.find<std::int64_t>("eventSize", 16);
   if (!time_converter_){
       time_converter_ = SST::BaseComponent::getTimeConverter(tickIntervalString());
     }
 
   // Configure self link to handle event timing
-  selfEventLink_ = configureSelfLink("self", time_converter_, new Event::Handler<Hg::OperatingSystem>(this, &OperatingSystem::handleEvent));
+  selfEventLink_ = configureSelfLink("self", time_converter_, new Event::Handler2<Hg::OperatingSystem,&OperatingSystem::handleEvent>(this));
   assert(selfEventLink_);
   selfEventLink_->setDefaultTimeBase(time_converter_);
-
-  out_->verbose(CALL_INFO, 1, 0, "adding launch requests\n");
-  app_launcher_ = new AppLauncher(this);
-  addLaunchRequests(params);
-
-  //assume simple for now
-  compute_sched_ = SST::Hg::create<ComputeScheduler>(
-        "hg", params.find<std::string>("compute_scheduler", "simple"),
-        params, this, node_ ? node_->ncores() : 1, node_ ? node_->nsockets() : 1);
 
   StackAlloc::init(params);
   initThreading(params);
@@ -129,10 +124,10 @@ OperatingSystem::~OperatingSystem()
 {
   for (auto& pair : pending_library_request_){
     std::string name = pair.first;
-    for (Request* req : pair.second){
-        sst_hg_abort_printf("OperatingSystem:: never registered library %s on os %d for event %s",
-                            name.c_str(), int(addr()),
-                            toString(req).c_str());
+    for (Request *req : pair.second) {
+      sst_hg_abort_printf(
+          "OperatingSystem:: never registered library %s on os %d for event %s",
+          name.c_str(), int(addr()), toString(req).c_str());
     }
   }
 
@@ -140,12 +135,12 @@ OperatingSystem::~OperatingSystem()
     des_context_->destroyContext();
     delete des_context_;
   }
-  if (compute_sched_) delete compute_sched_;
 }
 
 void
 OperatingSystem::setup() {
-  SubComponent::setup();
+  app_launcher_ = new AppLauncher(this, npernode_);
+  addLaunchRequests(params_);
   for (auto r : requests_)
     selfEventLink_->send(r);
 }
@@ -183,40 +178,26 @@ OperatingSystem::startThread(Thread* t)
             stack,
             StackAlloc::stacksize(),
             parent->globalsStorage(),
-            nullptr);
+            parent->newTlsStorage());
     }
   running_threads_[t->tid()] = t;
-
-  //    if (gdb_active_){
-  //      static thread_lock all_threads_lock;
-  //      all_threads_lock.lock();
-  //      auto tid = t->tid();
-  //      Thread*& thrInMap = all_threads_[tid];
-  //      if (thrInMap){
-  //        spkt_abort_printf("error: thread %d already exists for app %d",
-  //                          t->tid(), thrInMap->aid());
-  //      }
-  //      thrInMap = t;
-  //      all_threads_lock.unlock();
-  //    }
-
 }
 
 /* Event handler
    * Incoming events are scanned and deleted
    * Record if the event received is the last one our neighbor will send
    */
-void OperatingSystem::handleEvent(SST::Event *ev) {
-  if (auto *req = dynamic_cast<AppLaunchRequest*>(ev)) {
-      Params params = req->params();
-      //params.print_all_params(std::cerr);
-      out_->verbose(CALL_INFO, 1, 0, "app name: %s\n",  params.find<std::string>("name").c_str());
-      app_launcher_->incomingRequest(req);
-    }
-  else {
-      sst_hg_abort_printf("Error! Bad Event Type received by %s!\n",
-                          getName().c_str());
-    }
+void
+OperatingSystem::handleEvent(SST::Event *ev) {
+  if (auto *req = dynamic_cast<AppLaunchRequest *>(ev)) {
+    Params params = req->params();
+    out_->debug(CALL_INFO, 1, 0, "app name: %s\n",
+                  params.find<std::string>("name").c_str());
+    app_launcher_->incomingRequest(req);
+  } else {
+    sst_hg_abort_printf("Error! Bad Event Type received by %s!\n",
+                        getName().c_str());
+  }
 }
 
 
@@ -238,36 +219,39 @@ OperatingSystem::addLaunchRequests(SST::Params& params)
   bool keep_going = true;
   int aid = 1;
   SST::Params all_app_params = params.get_scoped_params("app");
-  while (keep_going || aid < 10){
-      std::string name = sprintf("app%d",aid);
-      SST::Params app_params = params.get_scoped_params(name);
-      //app_params.print_all_params(std::cerr);
-      if (!app_params.empty()){
-          app_params.insert(all_app_params);
-          //      bool terminate_on_end = app_params.find<bool>("terminate", false);
-          //      if (terminate_on_end){
-          //        terminators_.insert(aid);
-          //      }
-          out_->verbose(CALL_INFO, 1, 0, "adding app launch request %d:%s\n", aid, name.c_str());
-          out_->flush();
-          AppLaunchRequest* mgr = new AppLaunchRequest(app_params, AppId(aid), name);
-          requests_.push_back(mgr);
-          keep_going = true;
+  while (keep_going || aid < 10) {
+    std::string name = sprintf("app%d", aid);
+    SST::Params app_params = params.get_scoped_params(name);
+    if (!app_params.empty()) {
+      app_params.insert(all_app_params);
+      //      bool terminate_on_end = app_params.find<bool>("terminate", false);
+      //      if (terminate_on_end){
+      //        terminators_.insert(aid);
+      //      }
+      out_->debug(CALL_INFO, 1, 0, "adding app launch request %d:%s\n", aid,
+                    name.c_str());
+      out_->flush();
+      for (int i = 0; i < npernode_; ++i) {
+        AppLaunchRequest *mgr =
+            new AppLaunchRequest(app_params, AppId(aid), name);
+        requests_.push_back(mgr);
+      }
+      keep_going = true;
 
-          App::lockDlopen(aid);
-        } else {
-          keep_going = false;
-        }
-      ++aid;
+      App::lockDlopen(aid);
+    } else {
+      keep_going = false;
     }
+    ++aid;
+  }
 }
 
-void
-OperatingSystem::startApp(App* theapp, const std::string&  /*unique_name*/)
-{
-    out_->verbose(CALL_INFO, 1, 0, "starting app %d:%d on physical thread %d\n",
+void 
+OperatingSystem::startApp(App *theapp,
+                          const std::string & /*unique_name*/) {
+  out_->debug(CALL_INFO, 1, 0, "starting app %d:%d on physical thread %d\n",
                 int(theapp->tid()), int(theapp->aid()), threadId());
-  //this should be called from the actual thread running it
+  // this should be called from the actual thread running it
   initThreading(params_);
   startThread(theapp);
 }
@@ -277,18 +261,19 @@ OperatingSystem::joinThread(Thread* t)
 {
   sst_hg_abort_printf("OperatingSystem::joinThread not fully implemented");
   if (t->getState() != Thread::DONE) {
-      //key* k = key::construct();
-      //      os_debug("joining thread %ld - thread not done so blocking on thread %p",
-      //          t->threadId(), active_thread_);
-      t->joiners_.push(active_thread_);
-      //      int ncores = active_thread_->numActiveCcores();
-      //      //when joining - release all cores
-      //      compute_sched_->releaseCores(ncores, active_thread_);
-      //      block();
-      //      compute_sched_->reserveCores(ncores, active_thread_);
-    } else {
-      //      os_debug("joining completed thread %ld", t->threadId());
-    }
+    // key* k = key::construct();
+    //       os_debug("joining thread %ld - thread not done so blocking on
+    //       thread %p",
+    //           t->threadId(), active_thread_);
+    t->joiners_.push(active_thread_);
+    //      int ncores = active_thread_->numActiveCcores();
+    //      //when joining - release all cores
+    //      compute_sched_->releaseCores(ncores, active_thread_);
+    //      block();
+    //      compute_sched_->reserveCores(ncores, active_thread_);
+  } else {
+    //      os_debug("joining completed thread %ld", t->threadId());
+  }
   running_threads_.erase(t->tid());
   delete t;
 }
@@ -315,15 +300,16 @@ OperatingSystem::completeActiveThread()
 
   //if any threads waiting on the join, unblock them
   while (!thr_todelete->joiners_.empty()) {
-      Thread* blocker = thr_todelete->joiners_.front();
-      out_->verbose(CALL_INFO, 1, 0, "thread %d is unblocking joiner %p\n",
+    Thread *blocker = thr_todelete->joiners_.front();
+    out_->debug(CALL_INFO, 1, 0, "thread %d is unblocking joiner %p\n",
                   thr_todelete->threadId(), blocker);
-      unblock(blocker);
-      //to_awake_.push(thr_todelete->joiners_.front());
-      thr_todelete->joiners_.pop();
-    }
-  active_thread_ = nullptr;  
-  out_->verbose(CALL_INFO, 1, 0, "completing context %d on thread %d\n", thr_todelete->threadId(), threadId());
+    unblock(blocker);
+    // to_awake_.push(thr_todelete->joiners_.front());
+    thr_todelete->joiners_.pop();
+  }
+  active_thread_ = nullptr;
+  out_->debug(CALL_INFO, 1, 0, "completing context %d on thread %d\n",
+                thr_todelete->threadId(), threadId());
   thr_todelete->context()->completeContext(des_context_);
 }
 
@@ -337,14 +323,18 @@ OperatingSystem::switchToThread(Thread* tothread)
       return;
     }
 
-  out_->verbose(CALL_INFO, 1, 0, "switching to context %d on physical thread %d\n", tothread->threadId(), threadId());
-  if (active_thread_ == blocked_thread_){
-      blocked_thread_ = nullptr;
-    }
+  out_->debug(CALL_INFO, 1, 0,
+                "switching to context %d on physical thread %d\n",
+                tothread->threadId(), threadId());
+  if (active_thread_ == blocked_thread_) {
+    blocked_thread_ = nullptr;
+  }
   active_thread_ = tothread;
   activeOs() = this;
   tothread->context()->resumeContext(des_context_);
-  out_->verbose(CALL_INFO, 1, 0, "switched back from context %d to main thread %d\n", tothread->threadId(), threadId());
+  out_->debug(CALL_INFO, 1, 0,
+                "switched back from context %d to main thread %d\n",
+                tothread->threadId(), threadId());
   /** back to main thread */
   active_thread_ = nullptr;
 }
@@ -364,7 +354,8 @@ OperatingSystem::block()
   Thread* old_thread = active_thread_;
   //reset the time flag
   active_thread_->setTimedOut(false);
-  out_->verbose(CALL_INFO, 1, 0, "pausing context %d on physical thread %d\n", active_thread_->threadId(), threadId());
+  out_->debug(CALL_INFO, 1, 0, "pausing context %d on physical thread %d\n",
+                active_thread_->threadId(), threadId());
   blocked_thread_ = active_thread_;
   active_thread_ = nullptr;
   old_context->pauseContext(des_context_);
@@ -375,24 +366,14 @@ OperatingSystem::block()
 
   //restore state to indicate this thread and this OS are active again
   activeOs() = this;
-  out_->verbose(CALL_INFO, 1, 0, "resuming context %d on physical thread %d\n", active_thread_->threadId(), threadId());
+  out_->debug(CALL_INFO, 1, 0, "resuming context %d on physical thread %d\n",
+                active_thread_->threadId(), threadId());
   active_thread_ = old_thread;
   active_thread_->incrementBlockCounter();
 
    //collect any statistics associated with the elapsed time
   Timestamp after = now();
   TimeDelta elapsed = after - before;
-
-//  if (elapsed.ticks()){
-//    active_thread_->collectStats(before, elapsed);
-//  }
-}
-
-void
-OperatingSystem::blockTimeout(TimeDelta delay)
-{
-  sendDelayedExecutionEvent(delay, new TimeoutEvent(this, active_thread_));
-  block();
 }
 
 void
@@ -405,6 +386,13 @@ OperatingSystem::unblock(Thread* thr)
     } else {
       switchToThread(thr);
     }
+}
+
+void
+OperatingSystem::blockTimeout(TimeDelta delay)
+{
+  sendDelayedExecutionEvent(delay, new TimeoutEvent(this, active_thread_));
+  block();
 }
 
 Thread*
@@ -484,14 +472,14 @@ OperatingSystem::getCondition(int id)
 // LIBRARIES
 //
 
-Library*
-OperatingSystem::currentLibrary(const std::string &name)
-{
-  return currentOs()->lib(name);
-}
+// Library*
+// OperatingSystem::currentEventLibrary(const std::string &name)
+// {
+//   return currentOs()->eventLibrary(name);
+// }
 
-Library*
-OperatingSystem::lib(const std::string& name) const
+EventLibrary*
+OperatingSystem::eventLibrary(const std::string& name) const
 {
   auto it = libs_.find(name);
   if (it == libs_.end()) {
@@ -502,40 +490,40 @@ OperatingSystem::lib(const std::string& name) const
 }
 
 void
-OperatingSystem::registerLib(Library* lib)
+OperatingSystem::registerEventLib(EventLibrary* lib)
 {
 #if SST_HG_SANITY_CHECK
   if (lib->libName() == "") {
     sprockit::abort("OperatingSystem: trying to register a lib with no name");
   }
 #endif
-  out_->verbose(CALL_INFO, 1, 0, "registering lib %s:%p\n", lib->libName().c_str(), lib);
+  out_->debug(CALL_INFO, 1, 0, "registering lib %s:%p\n", lib->libName().c_str(), lib);
   int& refcount = lib_refcounts_[lib];
   ++refcount;
   libs_[lib->libName()] = lib;
-  out_->verbose(CALL_INFO, 1, 0, "OS %d should no longer drop events for %s\n",
-              addr(), lib->libName().c_str());
+  out_->debug(CALL_INFO, 1, 0, "OS %d should no longer drop events for %s\n",
+                addr(), lib->libName().c_str());
   auto iter = pending_library_request_.find(lib->libName());
-  if (iter != pending_library_request_.end()){
-    const std::list<Request*> reqs = iter->second;
-    for (Request* req : reqs){
-        out_->verbose(CALL_INFO, 1, 0, "delivering delayed event to lib %s: %s\n",
+  if (iter != pending_library_request_.end()) {
+    const std::list<Request *> reqs = iter->second;
+    for (Request *req : reqs) {
+      out_->debug(CALL_INFO, 1, 0, "delivering delayed event to lib %s: %s\n",
                     lib->libName().c_str(), toString(req).c_str());
-      sendExecutionEventNow(newCallback(lib, &Library::incomingRequest, req));
+      sendExecutionEventNow(newCallback(lib, &EventLibrary::incomingRequest, req));
     }
     pending_library_request_.erase(iter);
   }
 }
 
-void
-OperatingSystem::unregisterLib(Library* lib)
-{
-  out_->verbose(CALL_INFO, 1, 0, "unregistering lib %s\n", lib->libName().c_str());
-  int& refcount = lib_refcounts_[lib];
-  if (refcount == 1){
+void 
+OperatingSystem::unregisterEventLib(EventLibrary *lib) {
+  out_->debug(CALL_INFO, 1, 0, "unregistering lib %s\n",
+                lib->libName().c_str());
+  int &refcount = lib_refcounts_[lib];
+  if (refcount == 1) {
     lib_refcounts_.erase(lib);
-    out_->verbose(CALL_INFO, 1, 0, "OS %d will now drop events for %s\n",
-                addr(), lib->libName().c_str());
+    out_->debug(CALL_INFO, 1, 0, "OS %d will now drop events for %s\n",
+                  addr(), lib->libName().c_str());
     libs_.erase(lib->libName());
     //delete lib;
   } else {
@@ -544,17 +532,17 @@ OperatingSystem::unregisterLib(Library* lib)
 }
 
 bool
-OperatingSystem::handleLibraryRequest(const std::string& name, Request* req)
+OperatingSystem::handleEventLibraryRequest(const std::string& name, Request* req)
 {
   auto it = libs_.find(name);
   bool found = it != libs_.end();
   if (found){
-    Library* lib = it->second;
-    out_->verbose(CALL_INFO, 1, 0, "delivering message to lib %s:%p: %s\n",
-                name.c_str(), lib, toString(req).c_str());
+    EventLibrary* lib = it->second;
+    out_->debug(CALL_INFO, 1, 0, "delivering message to event lib %s:%p: %s\n",
+                  name.c_str(), lib, toString(req).c_str());
     lib->incomingRequest(req);
   } else {
-      out_->verbose(CALL_INFO, 1, 0, "unable to deliver message to lib %s: %s\n",
+    out_->debug(CALL_INFO, 1, 0, "unable to deliver message to event lib %s: %s\n",
                   name.c_str(), toString(req).c_str());
   }
   return found;
@@ -566,18 +554,20 @@ OperatingSystem::handleRequest(Request* req)
   //this better be an incoming event to a library, probably from off node
   Flow* libmsg = dynamic_cast<Flow*>(req);
   if (!libmsg) {
-      out_->verbose(CALL_INFO, 1, 0, "OperatingSystem::handle_event: got event %s instead of library event\n",
-     toString(req).c_str());
+    out_->debug(CALL_INFO, 1, 0,
+                "OperatingSystem::handle_event: got event %s instead of library event\n",
+                toString(req).c_str());
+    // if libmsg is null we cannot continue
+    return;
   }
 
-  bool found = handleLibraryRequest(libmsg->libname(), req);
-  if (!found){
-//    os_debug("delaying event to lib %s: %s",
-//             libmsg->libname().c_str(), libmsg->toString().c_str());
+  bool found = handleEventLibraryRequest(libmsg->libname(), req);
+  if (!found) {
+    out_->debug(CALL_INFO, 1, 0, "delaying event to lib %s: %s",
+                libmsg->libname().c_str(), libmsg->toString().c_str());
     pending_library_request_[libmsg->libname()].push_back(req);
   }
 }
-
 
 } // namespace Hg
 } // namespace SST

@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -195,15 +195,15 @@ private:
         Addr addr;
         bool isWrite;
         unsigned numBytes;
-		void serialize_order(SST::Core::Serialization::serializer &ser)  override {
-			ser & id;
-			ser & addr;
-			ser & isWrite;
-			ser & numBytes;
-		}
-	  private:
-        Req() {}
-		ImplementSerializable(SST::MemHierarchy::pagedMultiMemory::Req)
+	void serialize_order(SST::Core::Serialization::serializer &ser)  override {
+	    SST_SER(id);
+	    SST_SER(addr);
+	    SST_SER(isWrite);
+            SST_SER(numBytes);
+	}
+	private:
+            Req() {}
+	    ImplementSerializable(SST::MemHierarchy::pagedMultiMemory::Req)
     };
     pageInfo::pageList_t pageList; // used in FIFO
 
@@ -275,7 +275,7 @@ public:
     public:
         void serialize_order(SST::Core::Serialization::serializer &ser)  override {
             Event::serialize_order(ser);
-            ser & req;  // Cannot serialize pointers unless they are a serializable object
+            SST_SER(req);
         }
 
         ImplementSerializable(SST::MemHierarchy::pagedMultiMemory::MemCtrlEvent);

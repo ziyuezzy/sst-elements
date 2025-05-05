@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -72,8 +72,6 @@ void* loadExternLibrary(const std::string& libname, const std::string& searchPat
     sst_hg_abort_printf("%s not found in current directory or in path=%s",
                       libname.c_str(), searchPath.c_str());
   }
-
-  //std::cerr << "Loading external library " << fullpath << std::endl;
 
   // This is a little weird, but always try the last path - if we
   // didn't succeed in the stat, we'll get a file not found error

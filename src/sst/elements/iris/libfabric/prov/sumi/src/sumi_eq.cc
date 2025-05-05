@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -103,7 +103,7 @@ extern "C" DIRECT_FN  int sumi_eq_open(struct fid_fabric *fabric, struct fi_eq_a
 	if (!fabric)
 		return -FI_EINVAL;
 
-  struct sumi_fid_eq *eq = (sumi_fid_eq*) calloc(1, sizeof(fid_eq));
+  struct sumi_fid_eq *eq = (sumi_fid_eq*) calloc(1, sizeof(sumi_fid_eq));
   if (!eq)
 		return -FI_ENOMEM;
 

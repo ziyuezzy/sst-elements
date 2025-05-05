@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -196,10 +196,10 @@ private:
         bool isWrite;
         unsigned numBytes;
 		void serialize_order(SST::Core::Serialization::serializer &ser)  override {
-			ser & id;
-			ser & addr;
-			ser & isWrite;
-			ser & numBytes;
+			SST_SER(id);
+			SST_SER(addr);
+			SST_SER(isWrite);
+			SST_SER(numBytes);
 		}
 	  private:
         Req() {}
@@ -275,7 +275,7 @@ public:
     public:
         void serialize_order(SST::Core::Serialization::serializer &ser)  override {
             Event::serialize_order(ser);
-            ser & req;  // Cannot serialize pointers unless they are a serializable object
+            SST_SER(req);  // Cannot serialize pointers unless they are a serializable object
         }
 
         ImplementSerializable(SST::MemHierarchy::HBMpagedMultiMemory::MemCtrlEvent);

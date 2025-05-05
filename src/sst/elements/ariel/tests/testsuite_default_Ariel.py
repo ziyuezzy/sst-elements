@@ -36,12 +36,12 @@ class testcase_Ariel(SSTTestCase):
         self.ariel_Template("memHstream")
 
     @unittest.skipIf(not pin_loaded, "Ariel: Requires PIN, but Env Var 'INTEL_PIN_DIRECTORY' is not found or path does not exist.")
-    @unittest.skipIf(host_os_is_osx(), "Ariel: Open MP is not supported on OSX.")
+    @unittest.skipIf(host_os_get_distribution_type() == OS_DIST_OSX, "Ariel: Open MP is not supported on OSX.")
     def test_Ariel_test_ivb(self):
         self.ariel_Template("ariel_ivb")
 
     @unittest.skipIf(not pin_loaded, "Ariel: Requires PIN, but Env Var 'INTEL_PIN_DIRECTORY' is not found or path does not exist.")
-    @unittest.skipIf(host_os_is_osx(), "Ariel: Open MP is not supported on OSX.")
+    @unittest.skipIf(host_os_get_distribution_type() == OS_DIST_OSX, "Ariel: Open MP is not supported on OSX.")
     @unittest.skipIf(testing_check_get_num_ranks() > 1, "Ariel: test_Ariel_test_snb skipped if ranks > 1 - Sandy Bridge test is incompatible with Multi-Rank.")
     def test_Ariel_test_snb(self):
         self.ariel_Template("ariel_snb")
@@ -149,25 +149,21 @@ class testcase_Ariel(SSTTestCase):
         self.ArielElementompmybarrierDir = "{0}/testopenMP/ompmybarrier".format(test_path)
 
         # Add the API directory to LD_LIBRARY_PATH
-        # It is set in the Makefile but we set it here as well
-        # to support out-of-source builds
-        #ArielApiDir = "{0}/api".format(self.ArielElementDir)
-        ElementsBuildDir = sstsimulator_conf_get_value_str("SST_ELEMENT_LIBRARY", "SST_ELEMENT_LIBRARY_BUILDDIR")
-        ArielApiDir = "{0}/src/sst/elements/ariel/api".format(ElementsBuildDir)
+        # Element libraries are in <prefix>/lib/sst_element_libraries. Regular libraries are in <prefix>/lib.
+        # There is no separate config variable for this so we get the parent of the element library directory.
+        elements_libdir = sstsimulator_conf_get_value('SST_ELEMENT_LIBRARY', 'SST_ELEMENT_LIBRARY_LIBDIR', str)
+        libdir = os.path.join(elements_libdir, '..')
+
         current_ld_library_path = os.environ.get("LD_LIBRARY_PATH", "")
-
-        OSCommand("make", set_cwd=ArielApiDir).run()
-        OSCommand("cp {0}/libarielapi.so {1}/libarielapi.so".format(ArielApiDir,self.ArielElementStreamDir)).run()
-
         if current_ld_library_path != "":
-            new_ld_library_path = f"{current_ld_library_path}:{ArielApiDir}"
+            new_ld_library_path = f"{current_ld_library_path}:{libdir}"
         else:
-            new_ld_library_path = ArielApiDir
+            new_ld_library_path = libdir
 
         os.environ["LD_LIBRARY_PATH"] = new_ld_library_path
 
         # Now build the Ariel stream example
-        cmd = "make"
+        cmd = f"make LDFLAGS=-L{libdir}"
         rtn1 = OSCommand(cmd, set_cwd=self.ArielElementStreamDir).run()
         log_debug("Ariel stream Make result = {0}; output =\n{1}".format(rtn1.result(), rtn1.output()))
         if rtn1.result() != 0:

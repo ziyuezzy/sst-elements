@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -65,12 +65,12 @@ route_test::route_test(ComponentId_t cid, Params& params) :
 
 
     // // Register a clock
-    // registerClock( "1GHz", new Clock::Handler<route_test>(this,&route_test::clock_handler), false);
+    // registerClock( "1GHz", new Clock::Handler2<route_test,&route_test::clock_handler>(this), false);
 
     registerAsPrimaryComponent();
     primaryComponentDoNotEndSim();
 
-    link_control->setNotifyOnReceive(new SST::Interfaces::SimpleNetwork::Handler<route_test>(this,&route_test::handle_event));
+    link_control->setNotifyOnReceive(new SST::Interfaces::SimpleNetwork::Handler2<route_test,&route_test::handle_event>(this));
 }
 
 

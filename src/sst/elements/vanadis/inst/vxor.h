@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -35,13 +35,13 @@ public:
         isa_int_regs_out[0] = dest;
     }
 
-    virtual VanadisXorInstruction* clone() { return new VanadisXorInstruction(*this); }
+    virtual VanadisXorInstruction* clone() override { return new VanadisXorInstruction(*this); }
 
-    virtual VanadisFunctionalUnitType getInstFuncType() const { return INST_INT_ARITH; }
+    virtual VanadisFunctionalUnitType getInstFuncType() const override { return INST_INT_ARITH; }
 
-    virtual const char* getInstCode() const { return "XOR"; }
+    virtual const char* getInstCode() const override { return "XOR"; }
 
-    virtual void printToBuffer(char* buffer, size_t buffer_size)
+    virtual void printToBuffer(char* buffer, size_t buffer_size) override
     {
         snprintf(
             buffer, buffer_size,

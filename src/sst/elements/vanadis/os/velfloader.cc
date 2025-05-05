@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -88,7 +88,7 @@ void loadElfFile( Output* output, Interfaces::StandardMem* mem_if, MMU_Lib::MMU*
                         numBytes = imageLen - imageOffset;
                     }
                     size_t pageOffset = (virtAddr + imageOffset) - virtAddrPage;
-                    fread( buffer.data() + pageOffset, numBytes, 1, exec_file);
+                    (void) !fread( buffer.data() + pageOffset, numBytes, 1, exec_file);
                     imageOffset += numBytes;
                     output->verbose( CALL_INFO, 2, 0,"write page, pageVirtAddr=%#" PRIx64 " imageOffset=%zu pageOffset=%zu numBytes=%zu\n",
                         virtAddrPage,imageOffset,pageOffset,numBytes); 
@@ -160,7 +160,7 @@ uint8_t* readElfPage( Output* output, VanadisELFInfo* elf_info, int vpn, int pag
         output->verbose( CALL_INFO, 2, VANADIS_OS_DBG_READ_ELF,"imageOffset=%zu dataOffset=%zu numBytes=%zu toEnd=%zu\n", imageOffset, dataOffset, numBytes, secImageLen - imageOffset );
         fseek(exec_file, secImageOffset + imageOffset, SEEK_SET); 
 
-        fread( data + dataOffset, numBytes, 1, exec_file);
+        (void) !fread( data + dataOffset, numBytes, 1, exec_file);
     }
 
     fclose(exec_file);

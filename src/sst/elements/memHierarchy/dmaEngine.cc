@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -13,7 +13,7 @@
 // information, see the LICENSE file in the top level directory of the
 // distribution.
 
-#include <sst_config.h>
+#include <sst/core/sst_config.h>
 #include "dmaEngine.h"
 
 #include <sst/core/component.h>
@@ -31,8 +31,8 @@ DMAEngine::DMAEngine(ComponentId_t id, Params &params) :
             (Output::output_location_t)params.find<int>("debug", 0));
     statsOutputTarget = (Output::output_location_t)params.find<int>("printStats", 0);
 
-    TimeConverter *tc = registerClock(params.find<std::string>("clockRate", "1 GHz"),
-            new Clock::Handler<DMAEngine>(this, &DMAEngine::clock));
+    TimeConverter tc = registerClock(params.find<std::string>("clockRate", "1 GHz"),
+            new Clock::Handler2<DMAEngine, &DMAEngine::clock>(this));
     commandLink = configureLink("cmdLink", tc, NULL);
     if ( NULL == commandLink ) dbg.fatal(CALL_INFO, 1, "Missing cmdLink\n");
 

@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -47,7 +47,7 @@ cacheTracer::cacheTracer( ComponentId_t id, Params& params ): Component( id ) {
 
     string frequency = params.find<std::string>("clock", "1 Ghz");
     out->debug(CALL_INFO, 1, 0, "Registering cacheTracer clock at %s\n", frequency.c_str());
-    registerClock( frequency, new Clock::Handler<cacheTracer>(this, &cacheTracer::clock) );
+    registerClock( frequency, new Clock::Handler2<cacheTracer,&cacheTracer::clock>(this) );
     out->debug(CALL_INFO, 1, 0, "Clock registered\n");
 
     string tracePrefix = params.find<std::string>("tracePrefix", "");
@@ -116,8 +116,8 @@ bool cacheTracer::clock(Cycle_t current){
     unsigned int accessLatency = 0;
     SST::Event *ev = NULL;
     SST::MemHierarchy::Addr addr =0;
-    //uint64_t picoseconds = (uint64_t) picoTimeConv->convertFromCoreTime(getCurrentSimCycle());
-    uint64_t nanoseconds = (uint64_t) nanoTimeConv->convertFromCoreTime(getCurrentSimCycle());
+    //uint64_t picoseconds = (uint64_t) picoTimeConv.convertFromCoreTime(getCurrentSimCycle());
+    uint64_t nanoseconds = (uint64_t) nanoTimeConv.convertFromCoreTime(getCurrentSimCycle());
 
     // process Memevents from north-side to south-side
     while((ev = northBus->recv())){
@@ -141,7 +141,7 @@ bool cacheTracer::clock(Cycle_t current){
         if(writeDebug_8 & writeTrace){
              fprintf(traceFile,"NB: Addr: 0x%" PRIu64, addr);
              fprintf(traceFile, " timestamp: %" PRIu64, timestamp);
-             fprintf(traceFile, " Cmd: %u", me->getCmd());
+             fprintf(traceFile, " Cmd: %d", (int) me->getCmd());
              fprintf(traceFile, " ID: %" PRIu64 "-%d", me->getID().first, me->getID().second);
              fprintf(traceFile, " ResponseID: %" PRIu64 "-%d", me->getResponseToID().first, me->getResponseToID().second);
              //fprintf(traceFile, " @%" PRIu64, picoseconds);
@@ -184,7 +184,7 @@ bool cacheTracer::clock(Cycle_t current){
         if(writeDebug_8 & writeTrace){
              fprintf(traceFile,"SB: Addr: 0x%" PRIu64, me->getAddr());
              fprintf(traceFile, " timestamp: %" PRIu64, timestamp);
-             fprintf(traceFile, " Cmd: %u", me->getCmd());
+             fprintf(traceFile, " Cmd: %d", (int) me->getCmd());
              fprintf(traceFile, " ID: %" PRIu64 "-%d", me->getID().first, me->getID().second);
              fprintf(traceFile, " ResponseID: %" PRIu64 "-%d", me->getResponseToID().first, me->getResponseToID().second);
              //fprintf(traceFile, " @%" PRIu64, picoseconds);

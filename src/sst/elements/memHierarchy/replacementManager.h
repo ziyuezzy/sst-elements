@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -42,6 +42,7 @@ class ReplacementInfo {
         State getState() { return state; }
         void setState(State s) { state = s; }
 
+        virtual void reset() { state = I; }
     protected:
         unsigned int index;
         State state;
@@ -56,6 +57,11 @@ class CoherenceReplacementInfo : public ReplacementInfo {
         bool getShared() { return shared; }
         void setOwned(bool o) { owned = o; }
         void setShared(bool s) { shared = s; }
+        void reset() override {
+            ReplacementInfo::reset();
+            owned = false;
+            shared = false;
+        }
     protected:
         bool owned;
         bool shared;

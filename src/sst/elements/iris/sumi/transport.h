@@ -1,5 +1,5 @@
 /**
-Copyright 2009-2024 National Technology and Engineering Solutions of Sandia,
+Copyright 2009-2025 National Technology and Engineering Solutions of Sandia,
 LLC (NTESS).  Under the terms of Contract DE-NA-0003525, the U.S. Government
 retains certain rights in this software.
 
@@ -8,7 +8,7 @@ by National Technology and Engineering Solutions of Sandia, LLC., a wholly
 owned subsidiary of Honeywell International, Inc., for the U.S. Department of
 Energy's National Nuclear Security Administration under contract DE-NA0003525.
 
-Copyright (c) 2009-2024, NTESS
+Copyright (c) 2009-2025, NTESS
 
 All rights reserved.
 
@@ -45,7 +45,7 @@ Questions? Contact sst-macro-help@sandia.gov
 #pragma once
 
 #include <sst/core/params.h>
-#include <mercury/operating_system/libraries/api.h>
+#include <mercury/operating_system/libraries/library.h>
 #include <mercury/operating_system/process/software_id.h>
 #include <mercury/operating_system/process/app_id.h>
 #include <mercury/common/timestamp.h>
@@ -89,7 +89,10 @@ class Transport {
   }
 
   SST::Hg::NodeId addr() const {
-    return nid_;
+    //return nid_;
+    // In Mercury we do everything internally via rank id and convert to physical node
+    // only when entering/leaving Merlin.
+    return rank_;
   }
 
   int rank() const {

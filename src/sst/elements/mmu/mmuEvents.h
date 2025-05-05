@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -36,7 +36,7 @@ class TlbInitEvent  : public SST::Event {
 
     void serialize_order(SST::Core::Serialization::serializer& ser) override {
         Event::serialize_order(ser);
-        ser& pageShift;
+        SST_SER(pageShift);
     }
 
     ImplementSerializable(TlbInitEvent);
@@ -62,12 +62,12 @@ class TlbMissEvent  : public SST::Event {
   private:
     void serialize_order(SST::Core::Serialization::serializer& ser) override {
         Event::serialize_order(ser);
-        ser& id;
-        ser& hwThread;
-        ser& vpn;
-        ser& perms;
-        ser& instPtr;
-        ser& memAddr;
+        SST_SER(id);
+        SST_SER(hwThread);
+        SST_SER(vpn);
+        SST_SER(perms);
+        SST_SER(instPtr);
+        SST_SER(memAddr);
     }
         ImplementSerializable(TlbMissEvent);
 
@@ -97,10 +97,10 @@ class TlbMissEvent  : public SST::Event {
   private:
     void serialize_order(SST::Core::Serialization::serializer& ser) override {
         Event::serialize_order(ser);
-        ser& id;
-        ser& perms;
-        ser& ppn;
-        ser& success;
+        SST_SER(id);
+        SST_SER(perms);
+        SST_SER(ppn);
+        SST_SER(success);
     }
     ImplementSerializable(TlbFillEvent);
 
@@ -123,7 +123,7 @@ class TlbFlushReqEvent  : public SST::Event {
   private:
     void serialize_order(SST::Core::Serialization::serializer& ser) override {
         Event::serialize_order(ser);
-        ser& hwThread;
+        SST_SER(hwThread);
     }
     ImplementSerializable(TlbFlushReqEvent);
 
@@ -143,7 +143,7 @@ class TlbFlushRespEvent  : public SST::Event {
   private:
     void serialize_order(SST::Core::Serialization::serializer& ser) override {
         Event::serialize_order(ser);
-        ser& hwThread;
+        SST_SER(hwThread);
     }
     ImplementSerializable(TlbFlushRespEvent);
 

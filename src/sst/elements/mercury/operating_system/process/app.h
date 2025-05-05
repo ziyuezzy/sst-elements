@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -18,12 +18,11 @@
 #include <sst/core/params.h>
 
 #include <mercury/common/component.h>
-//#include <mercury/common/factory.h>
 #include <sst/core/eli/elementbuilder.h>
 #include <mercury/components/operating_system.h>
 #include <mercury/operating_system/process/thread.h>
 #include <mercury/operating_system/process/mutex.h>
-#include <mercury/operating_system/libraries/api.h>
+#include <mercury/operating_system/libraries/library.h>
 
 #include <fstream>
 
@@ -69,24 +68,9 @@ class App : public Thread
 
   static void deleteStatics();
 
-  void sleep(TimeDelta time);
+  // void sleep(TimeDelta time);
 
-  void compute(TimeDelta time);
-
-//  void computeInst(ComputeEvent* cmsg);
-
-//  void computeLoop(uint64_t num_loops,
-//    int nflops_per_loop,
-//    int nintops_per_loop,
-//    int bytes_per_loop);
-
-//  void computeBlockRead(uint64_t bytes);
-
-//  void computeBlockWrite(uint64_t bytes);
-
-//  void computeBlockMemcpy(uint64_t bytes);
-
-//  LibComputeMemmove* computeLib();
+  // void compute(TimeDelta time);
 
   ~App() override;
 
@@ -115,6 +99,8 @@ class App : public Thread
   int setenv(const std::string& name, const std::string& value, int overwrite);
 
   OperatingSystem* os() {return os_;}
+
+  void addAPI(std::string,Library*);
 
   /**
    * Let a parent application know about the existence of a subthread
@@ -174,9 +160,9 @@ class App : public Thread
     return globals_storage_;
   }
 
-//  void* newTlsStorage() {
-//    return allocateDataSegment(true);
-//  }
+ void* newTlsStorage() {
+   return allocateDataSegment(true);
+ }
 
   const std::string& uniqueName() const {
     return unique_name_;
@@ -194,11 +180,11 @@ class App : public Thread
 
   static void unlockDlopen(int aid);
 
-  static void dlcloseCheck_API(std::string api_name);
+  static void dlcloseCheck_Library(std::string api_name);
 
-  static void lockDlopen_API(std::string api_name);
+  static void lockDlopen_Library(std::string api_name);
 
-  static void unlockDlopen_API(std::string api_name);
+  static void unlockDlopen_Library(std::string api_name);
 
   static int appRC(){
     return app_rc_;
@@ -212,6 +198,12 @@ class App : public Thread
     return stderr_;
   }
 
+  unsigned int get_taskid() {
+    return taskid_;
+  }
+
+  Library* getLibrary(const std::string& name);
+
   std::ostream& coutStream();
   std::ostream& cerrStream();
 
@@ -224,8 +216,7 @@ class App : public Thread
   SST::Params params_;
 
  private:
-  API* getAPI(const std::string& name);
-
+  
   void dlcloseCheck(){
     dlcloseCheck(aid());
   }
@@ -236,7 +227,6 @@ class App : public Thread
 
   void computeDetailed(uint64_t flops, uint64_t intops, uint64_t bytes, int nthread);
 
-//  LibComputeMemmove* compute_lib_;
   std::string unique_name_;
 
   int next_tls_key_;
@@ -245,7 +235,7 @@ class App : public Thread
   std::map<long, Thread*> subthreads_;
   std::map<int, destructor_fxn> tls_key_fxns_;
   //  these can alias - so I can't use unique_ptr
-  std::map<std::string, API*> apis_;
+  std::map<std::string, Library*> apis_;
   std::map<std::string,std::string> env_;
 
   char env_string_[64];
@@ -274,6 +264,7 @@ class App : public Thread
   FILE* stdout_;
   FILE* stderr_;
   std::unique_ptr<SST::Output> out_;
+  unsigned int taskid_;
 };
 
 

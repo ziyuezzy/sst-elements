@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -81,14 +81,14 @@ class RdmaNicNetworkEvent : public Event {
   public:
     void serialize_order(SST::Core::Serialization::serializer &ser)  override {
         Event::serialize_order(ser);
-        ser & pktOverhead;
-        ser & streamId;
-        ser & streamSeq;
-        ser & destPid;
-        ser & srcPid;
-        ser & srcNode;
-        ser & buf;
-		ser & pktType;
+        SST_SER(pktOverhead);
+        SST_SER(streamId);
+        SST_SER(streamSeq);
+        SST_SER(destPid);
+        SST_SER(srcPid);
+        SST_SER(srcNode);
+        SST_SER(buf);
+		SST_SER(pktType);
     }
     ImplementSerializable(SST::MemHierarchy::RdmaNicNetworkEvent);
 };

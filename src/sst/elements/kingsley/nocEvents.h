@@ -1,10 +1,10 @@
 // -*- mode: c++ -*-
 
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -41,7 +41,7 @@ public:
 
     void serialize_order(SST::Core::Serialization::serializer &ser)  override {
         Event::serialize_order(ser);
-        ser & type;
+        SST_SER(type);
     }
 
 protected:
@@ -103,10 +103,10 @@ public:
 
     void serialize_order(SST::Core::Serialization::serializer &ser)  override {
         BaseNocEvent::serialize_order(ser);
-        ser & request;
-        ser & vn;
-        ser & size_in_flits;
-        ser & injectionTime;
+        SST_SER(request);
+        SST_SER(vn);
+        SST_SER(size_in_flits);
+        SST_SER(injectionTime);
     }
 
 private:
@@ -139,8 +139,8 @@ public:
 
     void serialize_order(SST::Core::Serialization::serializer &ser)  override {
         BaseNocEvent::serialize_order(ser);
-        ser & vn;
-        ser & credits;
+        SST_SER(vn);
+        SST_SER(credits);
     }
 
 private:
@@ -178,9 +178,9 @@ public:
 
     void serialize_order(SST::Core::Serialization::serializer &ser)  override {
         BaseNocEvent::serialize_order(ser);
-        ser & command;
-        ser & int_value;
-        ser & ua_value;
+        SST_SER(command);
+        SST_SER(int_value);
+        SST_SER(ua_value);
     }
 
 
@@ -248,11 +248,11 @@ private:
 
 //     void serialize_order(SST::Core::Serialization::serializer &ser)  override {
 //         BaseNocEvent::serialize_order(ser);
-//         ser & next_port;
-//         ser & next_vc;
-//         ser & vc;
-//         ser & credit_return_vc;
-//         ser & encap_ev;
+//         SST_SER(next_port);
+//         SST_SER(next_vc);
+//         SST_SER(vc);
+//         SST_SER(credit_return_vc);
+//         SST_SER(encap_ev);
 //     }
 
 // private:

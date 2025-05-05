@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -545,7 +545,7 @@ err:
 
 EXTERN_C DIRECT_FN STATIC  int sumi_sep_bind(fid_t fid, struct fid *bfid, uint64_t flags)
 {
-	int i, ret, n_ids;
+	int i, ret = 0, n_ids;
 #if 0
 	struct sumi_fid_ep  *ep;
 	struct sumi_fid_av  *av;

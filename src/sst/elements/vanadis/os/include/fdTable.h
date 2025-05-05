@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -235,7 +235,7 @@ public:
     FileDescriptorTable( SST::Output* output, FILE* fp ) {
         char* tmp = nullptr;
         size_t num = 0;
-        getline( &tmp, &num, fp );
+        (void) !getline( &tmp, &num, fp );
         output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"%s",tmp);
         assert( 0 == strcmp(tmp,"#FileDescriptorTable start\n") );
         free(tmp);
@@ -259,7 +259,7 @@ public:
 
         tmp = nullptr;
         num = 0;
-        getline( &tmp, &num, fp );
+        (void) !getline( &tmp, &num, fp );
         output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"%s",tmp);
         assert( 0 == strcmp(tmp,"#FileDescriptorTable end\n") );
         free(tmp);

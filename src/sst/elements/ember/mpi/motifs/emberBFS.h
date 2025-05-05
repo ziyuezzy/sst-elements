@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -67,7 +67,7 @@ struct ConstModel : public Model
 
     void serialize_order(SST::Core::Serialization::serializer& ser) override
     {
-        ser& val;
+        SST_SER(val);
     }
 
     ImplementSerializable(SST::Ember::ConstModel);
@@ -103,10 +103,10 @@ struct BilinearModel : public Model
 
     void serialize_order(SST::Core::Serialization::serializer& ser) override
     {
-        ser& A;
-        ser& B;
-        ser& C;
-        ser& D;
+        SST_SER(A);
+        SST_SER(B);
+        SST_SER(C);
+        SST_SER(D);
     }
 
     ImplementSerializable(SST::Ember::BilinearModel);
@@ -141,7 +141,7 @@ struct TraceModel : public Model
 
     void serialize_order(SST::Core::Serialization::serializer& ser) override
     {
-        ser& val;
+        SST_SER(val);
     }
 
     ImplementSerializable(SST::Ember::TraceModel);
@@ -186,10 +186,10 @@ struct ExpModel : public Model
 
     void serialize_order(SST::Core::Serialization::serializer& ser) override
     {
-        ser& A;
-        ser& B;
-        ser& C;
-        ser& D;
+        SST_SER(A);
+        SST_SER(B);
+        SST_SER(C);
+        SST_SER(D);
     }
 
     ImplementSerializable(SST::Ember::ExpModel);
@@ -272,7 +272,7 @@ struct PolyModelND : public Model
 
     void serialize_order(SST::Core::Serialization::serializer& ser) override
     {
-        ser& coeff;
+        SST_SER(coeff);
     }
 
     ImplementSerializable(SST::Ember::PolyModelND);
@@ -320,7 +320,7 @@ struct PolyModel : public SST::Core::Serialization::serializable
 
     void serialize_order(SST::Core::Serialization::serializer& ser) override
     {
-        ser& coeff;
+        SST_SER(coeff);
     }
 
     ImplementSerializable(SST::Ember::PolyModel);

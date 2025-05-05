@@ -1,8 +1,8 @@
-// Copyright 2013-2024 NTESS. Under the terms
+// Copyright 2013-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2013-2024, NTESS
+// Copyright (c) 2013-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -39,9 +39,9 @@ class NicInitEvent : public Event {
 public:
     void serialize_order(SST::Core::Serialization::serializer &ser)  override {
         Event::serialize_order(ser);
-        ser & node;
-        ser & vNic;
-        ser & num_vNics;
+        SST_SER(node);
+        SST_SER(vNic);
+        SST_SER(num_vNics);
     }
 
     ImplementSerializable(SST::Firefly::NicInitEvent);

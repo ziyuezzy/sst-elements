@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -173,14 +173,14 @@ private:
 public:
     void serialize_order(SST::Core::Serialization::serializer &ser)  override {
         MemEventBase::serialize_order(ser);
-        ser & dstAddr_;
-        ser & dstBaseAddr_;
-        ser & srcAddr_;
-        ser & srcBaseAddr_;
-        ser & size_;
-        ser & dstVAddr_;
-        ser & srcVAddr_;
-        ser & iPtr_;
+        SST_SER(dstAddr_);
+        SST_SER(dstBaseAddr_);
+        SST_SER(srcAddr_);
+        SST_SER(srcBaseAddr_);
+        SST_SER(size_);
+        SST_SER(dstVAddr_);
+        SST_SER(srcVAddr_);
+        SST_SER(iPtr_);
     }
 
     ImplementSerializable(SST::MemHierarchy::MoveEvent);

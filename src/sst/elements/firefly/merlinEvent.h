@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -169,18 +169,18 @@ class FireflyNetworkEvent : public Event {
   public:
     void serialize_order(SST::Core::Serialization::serializer &ser)  override {
         Event::serialize_order(ser);
-        ser & seq;
-        ser & offset;
-        ser & bufLen;
-        ser & buf;
-        ser & srcNode;
-        ser & srcPid;
-        ser & srcStream;
-        ser & destPid;
-        ser & pktOverhead;
-        ser & m_isHdr;
-        ser & m_isTail;
-        ser & m_isCtrl;
+        SST_SER(seq);
+        SST_SER(offset);
+        SST_SER(bufLen);
+        SST_SER(buf);
+        SST_SER(srcNode);
+        SST_SER(srcPid);
+        SST_SER(srcStream);
+        SST_SER(destPid);
+        SST_SER(pktOverhead);
+        SST_SER(m_isHdr);
+        SST_SER(m_isTail);
+        SST_SER(m_isCtrl);
     }
 
     ImplementSerializable(SST::Firefly::FireflyNetworkEvent);

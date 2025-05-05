@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -15,19 +15,17 @@
 
 #pragma once
 
-#include <sst/core/event.h>
 #include <mercury/common/timestamp.h>
+#include <mercury/common/events.h>
 #include <mercury/hardware/common/flow.h>
 #include <mercury/common/thread_safe_new.h>
-//#include <mercury/hardware/memory/memory_id.h>
-//#include <mercury/typedefs.h>
 #include <type_traits>
 #include <stdint.h>
 
-//DeclareDebugSlot(compute_intensity);
-
 namespace SST {
 namespace Hg {
+
+using MemoryAccessId = UniqueEventId;
 
 /**
  * Input for processor models that use
@@ -53,11 +51,11 @@ class ComputeEvent :
     return core_;
   }
 
-  hw::MemoryAccessId accessId() const {
+  MemoryAccessId accessId() const {
     return unique_id_;
   }
 
-  void setAccessId(hw::MemoryAccessId id) {
+  void setAccessId(MemoryAccessId id) {
     unique_id_ = id;
   }
 
@@ -68,14 +66,14 @@ class ComputeEvent :
  private:
   int core_;
 
-  hw::MemoryAccessId unique_id_;
+  MemoryAccessId unique_id_;
 
 };
 
 template <class T>
 class ComputeEvent_impl :
  public ComputeEvent,
- public sprockit::thread_safe_new<ComputeEvent_impl<T>>
+ public thread_safe_new<ComputeEvent_impl<T>>
 {
   NotSerializable(ComputeEvent_impl)
 
@@ -106,5 +104,5 @@ struct basic_instructions_st
 typedef ComputeEvent_impl<TimeDelta> TimedComputeEvent;
 typedef ComputeEvent_impl<basic_instructions_st> BasicComputeEvent;
 
-}
-}  // end of namespace
+} // end namespace Hg
+} // end namespace SST

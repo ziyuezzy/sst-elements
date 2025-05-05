@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -37,10 +37,11 @@ namespace Cassini {
 class AddrHistogrammer : public SST::MemHierarchy::CacheListener {
 public:
     AddrHistogrammer(ComponentId_t, Params& params);
+    AddrHistogrammer() : SST::MemHierarchy::CacheListener() {}
     ~AddrHistogrammer() {};
 
-    void notifyAccess(const CacheListenerNotification& notify);
-    void registerResponseCallback(Event::HandlerBase *handler);
+    void notifyAccess(const CacheListenerNotification& notify) override;
+    void registerResponseCallback(Event::HandlerBase *handler) override;
 
     SST_ELI_REGISTER_SUBCOMPONENT(
         AddrHistogrammer,

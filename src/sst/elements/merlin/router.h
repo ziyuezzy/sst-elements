@@ -1,10 +1,10 @@
 // -*- mode: c++ -*-
 
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -90,7 +90,7 @@ public:
 
     void serialize_order(SST::Core::Serialization::serializer &ser)  override {
         Event::serialize_order(ser);
-        ser & type;
+        SST_SER(type);
     }
 
 protected:
@@ -278,10 +278,10 @@ public:
 
     void serialize_order(SST::Core::Serialization::serializer &ser)  override {
         BaseRtrEvent::serialize_order(ser);
-        ser & size_in_flits;
-        ser & dest.addr;
-        ser & dest.addr_is_router;
-        ser & dest.addr_for_router;
+        SST_SER(size_in_flits);
+        SST_SER(dest.addr);
+        SST_SER(dest.addr_is_router);
+        SST_SER(dest.addr_for_router);
     }
 
 protected:
@@ -310,9 +310,9 @@ public:
 
     void serialize_order(SST::Core::Serialization::serializer &ser)  override {
         CtrlRtrEvent::serialize_order(ser);
-        ser & target;
-        ser & backoff;
-        ser & throttle_time;
+        SST_SER(target);
+        SST_SER(backoff);
+        SST_SER(throttle_time);
     }
 
 private:
@@ -368,8 +368,8 @@ public:
 
     void serialize_order(SST::Core::Serialization::serializer &ser)  override {
         BaseRtrEvent::serialize_order(ser);
-        ser & vc;
-        ser & credits;
+        SST_SER(vc);
+        SST_SER(credits);
     }
 
 private:
@@ -403,9 +403,9 @@ public:
 
     void serialize_order(SST::Core::Serialization::serializer &ser)  override {
         BaseRtrEvent::serialize_order(ser);
-        ser & command;
-        ser & int_value;
-        ser & ua_value;
+        SST_SER(command);
+        SST_SER(int_value);
+        SST_SER(ua_value);
     }
 
 
@@ -475,11 +475,11 @@ public:
 
     void serialize_order(SST::Core::Serialization::serializer &ser)  override {
         BaseRtrEvent::serialize_order(ser);
-        ser & next_port;
-        ser & next_vc;
-        ser & vc;
-        ser & credit_return_vc;
-        ser & encap_ev;
+        SST_SER(next_port);
+        SST_SER(next_vc);
+        SST_SER(vc);
+        SST_SER(credit_return_vc);
+        SST_SER(encap_ev);
     }
 
 private:

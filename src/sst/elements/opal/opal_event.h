@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // This file is part of the SST software package. For license
@@ -114,18 +114,18 @@ namespace SST{ namespace OpalComponent{
 
 			void serialize_order(SST::Core::Serialization::serializer &ser) override {
 				Event::serialize_order(ser);
-				ser & ev;
-				ser & address;
-				ser & paddress;
-                ser & faultLevel;
-				ser & size;
-				ser & nodeId;
-				ser & coreId;
-				ser & memType;
-				ser & hint;
-				ser & fileId;
-				ser & memContrlId;
-                ser & invalidate;
+				SST_SER(ev);
+				SST_SER(address);
+				SST_SER(paddress);
+                SST_SER(faultLevel);
+				SST_SER(size);
+				SST_SER(nodeId);
+				SST_SER(coreId);
+				SST_SER(memType);
+				SST_SER(hint);
+				SST_SER(fileId);
+				SST_SER(memContrlId);
+                SST_SER(invalidate);
 			}
 
 

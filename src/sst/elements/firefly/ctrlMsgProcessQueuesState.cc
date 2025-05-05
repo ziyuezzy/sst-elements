@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -60,11 +60,11 @@ ProcessQueuesState::ProcessQueuesState( ComponentId_t id, Params& params ) :
 
     m_delayLink = configureSelfLink(
                         "ProcessQueuesStateSelfLink." + ss.str(), "1 ns",
-                                new Event::Handler<ProcessQueuesState>(this,&ProcessQueuesState::delayHandler));
+                                new Event::Handler2<ProcessQueuesState,&ProcessQueuesState::delayHandler>(this));
 
     m_loopLink = configureLink(
             params.find<std::string>("loopBackPortName", "loop"), "1 ns",
-            new Event::Handler<ProcessQueuesState>(this,&ProcessQueuesState::loopHandler) );
+            new Event::Handler2<ProcessQueuesState,&ProcessQueuesState::eventLoopHandler>(this) );
     assert(m_loopLink);
 
     m_ackVN = params.find<int>( "ackVN", 0 );
@@ -1108,7 +1108,7 @@ void ProcessQueuesState::loopSendResp( int core, void* key )
     m_loopLink->send(0, new LoopBackEvent( core, key ) );
 }
 
-void ProcessQueuesState::loopHandler( Event* ev )
+void ProcessQueuesState::eventLoopHandler( Event* ev )
 {
     LoopBackEvent* event = static_cast< LoopBackEvent* >(ev);
     m_dbg.debug(CALL_INFO,1,DBG_MSK_PQS_LOOP,"%s core=%d key=%p\n",

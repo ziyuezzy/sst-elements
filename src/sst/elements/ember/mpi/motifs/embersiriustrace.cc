@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -371,7 +371,7 @@ void EmberSIRIUSTraceGenerator::readMPIWaitall( std::queue<EmberEvent*>& evQ ) {
 	const double endTime = readTime();
 	const int32_t result = readINT32();
 
-	MessageRequest* reqs = (MessageRequest*) malloc( sizeof(MessageRequest*) * requestAddr.size() );
+	MessageRequest* reqs = (MessageRequest*) malloc( sizeof(MessageRequest) * requestAddr.size() );
 	for(uint32_t i = 0; i < requestAddr.size(); i++) {
 		auto findReq = liveRequests.find(requestAddr[i]);
 

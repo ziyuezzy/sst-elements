@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -27,6 +27,8 @@
 #include "velf/velfinfo.h"
 #include "vfpflags.h"
 #include "vfuncunit.h"
+#include "rocc/vroccinterface.h"
+#include "rocc/vbasicrocc.h"
 
 #include "os/vgetthreadstate.h"
 #include "os/vdumpregsreq.h"
@@ -178,6 +180,7 @@ public:
     // Optional since there is nothing to document
     SST_ELI_DOCUMENT_SUBCOMPONENT_SLOTS(
         { "lsq", "Load-Store Queue for Memory Access", "SST::Vanadis::VanadisLoadStoreQueue" },
+        { "rocc", "RoCC accelerator interface(s)", "SST::Vanadis::VanadisRoCCInterface" },
         { "mem_interface_inst", "Interface to memory system for instructions", "SST::Interfaces::StandardMem" },
     )
 
@@ -297,6 +300,7 @@ private:
     std::vector<VanadisDecoder*>                            thread_decoders;
     std::vector<const VanadisDecoderOptions*>               isa_options;
 
+
     std::vector<VanadisFunctionalUnit*> fu_int_arith;
     std::vector<VanadisFunctionalUnit*> fu_int_div;
     std::vector<VanadisFunctionalUnit*> fu_branch;
@@ -320,6 +324,9 @@ private:
     VanadisLoadStoreQueue* lsq;
     StandardMem*           memInstInterface;
 
+    std::vector<VanadisRoCCInterface*> roccs_;
+    std::vector<std::deque<VanadisInstruction*>> rocc_queues_;
+
     bool* halted_masks;
     bool  print_int_reg;
     bool  print_fp_reg;
@@ -333,8 +340,8 @@ private:
     uint64_t dCacheLineWidth;
     uint64_t iCacheLineWidth;
 
-    TimeConverter*                     cpuClockTC;
-    Clock::Handler<VANADIS_COMPONENT>* cpuClockHandler;
+    TimeConverter                      cpuClockTC;
+    Clock::HandlerBase*                cpuClockHandler;
 
     FILE*           pipelineTrace;
 

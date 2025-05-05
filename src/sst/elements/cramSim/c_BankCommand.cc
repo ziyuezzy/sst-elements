@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -165,15 +165,15 @@ void c_BankCommand::print(SST::Output *x_debugOutput,const std::string x_prefix,
 
 void c_BankCommand::serialize_order(SST::Core::Serialization::serializer &ser)
 {
-    ser & m_seqNum;
-    ser & m_addr;
-    ser & m_row;
-    ser & m_bankId;
-    ser & m_bankIdVec;
-    ser & m_cmdMnemonic;
-    ser & m_cmdToString;
-    ser & m_isResponseReady;
-    ser & m_isResponseReady;
+    SST_SER(m_seqNum);
+    SST_SER(m_addr);
+    SST_SER(m_row);
+    SST_SER(m_bankId);
+    SST_SER(m_bankIdVec);
+    SST_SER(m_cmdMnemonic);
+    SST_SER(m_cmdToString);
+    SST_SER(m_isResponseReady);
+    SST_SER(m_isResponseReady);
 
-    ser & m_hashedAddr;
+    SST_SER(m_hashedAddr);
 }

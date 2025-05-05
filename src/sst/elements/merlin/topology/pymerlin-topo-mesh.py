@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #
-# Copyright 2009-2024 NTESS. Under the terms
+# Copyright 2009-2025 NTESS. Under the terms
 # of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 #
-# Copyright (c) 2009-2024, NTESS
+# Copyright (c) 2009-2025, NTESS
 # All rights reserved.
 #
 # Portions are copyright of other developers:
@@ -77,9 +77,9 @@ class _topoMeshBase(Topology):
 
 
     def setShape(self,shape,width,local_ports):
-        this.shape = shape
-        this.width = width
-        this.local_ports = local_ports
+        self.shape = shape
+        self.width = width
+        self.local_ports = local_ports
         
     def _formatShape(self, arr):
         return 'x'.join([str(x) for x in arr])

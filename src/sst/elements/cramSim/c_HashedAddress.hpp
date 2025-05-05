@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -72,15 +72,15 @@ public:
 
   void serialize_order(SST::Core::Serialization::serializer &ser) override
   {
-    ser & m_channel;
-    ser & m_rank;
-    ser & m_bankgroup;
-    ser & m_bank;
-    ser & m_row;
-    ser & m_col;
-    ser & m_cacheline;
-    ser & m_bankId;
-    ser & m_rankId;
+    SST_SER(m_channel);
+    SST_SER(m_rank);
+    SST_SER(m_bankgroup);
+    SST_SER(m_bank);
+    SST_SER(m_row);
+    SST_SER(m_col);
+    SST_SER(m_cacheline);
+    SST_SER(m_bankId);
+    SST_SER(m_rankId);
   }
 
   ImplementSerializable(c_HashedAddress);

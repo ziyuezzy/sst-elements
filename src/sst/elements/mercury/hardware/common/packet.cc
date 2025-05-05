@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -47,15 +47,15 @@ void
 Packet::serialize_order(Core::Serialization::serializer& ser)
 {
   SST::Event::serialize_order(ser);
-  ser & toaddr_;
-  ser & fromaddr_;
-  ser & flow_id_;
-  ser & num_bytes_;
-  ser & qos_;
-  ser & payload_;
-  ser & rtr_metadata_;
-  ser & stats_metadata_;
-  ser & nic_metadata_;
+  SST_SER(toaddr_);
+  SST_SER(fromaddr_);
+  SST_SER(flow_id_);
+  SST_SER(num_bytes_);
+  SST_SER(qos_);
+  SST_SER(payload_);
+  SST_SER(rtr_metadata_);
+  SST_SER(stats_metadata_);
+  SST_SER(nic_metadata_);
 }
 
 } // end namespace Hg

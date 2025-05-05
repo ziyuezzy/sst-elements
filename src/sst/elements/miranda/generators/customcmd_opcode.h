@@ -1,8 +1,8 @@
-// Copyright 2013-2024 NTESS. Under the terms
+// Copyright 2013-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2013-2024, NTESS
+// Copyright (c) 2013-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -62,10 +62,10 @@ public:
     /* Serialization **/
     // Must be serializable so that CustomMemEvent can be serialized
     void serialize_order(SST::Core::Serialization::serializer& ser) override {
-        ser & addr_;
-        ser & bytes_;
-        ser & opcode_;
-        ser & response_;
+        SST_SER(addr_);
+        SST_SER(bytes_);
+        SST_SER(opcode_);
+        SST_SER(response_);
     }
     ImplementSerializable(SST::Miranda::OpCodeStdMem);
     

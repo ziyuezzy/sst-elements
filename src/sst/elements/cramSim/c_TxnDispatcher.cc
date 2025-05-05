@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -85,18 +85,18 @@ c_TxnDispatcher::c_TxnDispatcher(ComponentId_t x_id, Params &params):Component(x
 
     //set our clock
     registerClock(l_clockFreqStr,
-                  new Clock::Handler<c_TxnDispatcher>(this, &c_TxnDispatcher::clockTic));
+                  new Clock::Handler2<c_TxnDispatcher,&c_TxnDispatcher::clockTic>(this));
 
 
     //---- configure link ----//
-    m_txnGenLink = configureLink("txnGen",new Event::Handler<c_TxnDispatcher>(this,&c_TxnDispatcher::handleTxnGenEvent));
+    m_txnGenLink = configureLink("txnGen",new Event::Handler2<c_TxnDispatcher,&c_TxnDispatcher::handleTxnGenEvent>(this));
     if(!m_txnGenLink) {
         output->fatal(CALL_INFO, -1, "txnGen link is not found.. exit\n");
     }
 
     for (int i = 0; i < k_numLanes; i++) {
         string l_linkName = "lane_" + to_string(i);
-        Link *l_link = configureLink(l_linkName,new Event::Handler<c_TxnDispatcher>(this, &c_TxnDispatcher::handleCtrlEvent));
+        Link *l_link = configureLink(l_linkName,new Event::Handler2<c_TxnDispatcher,&c_TxnDispatcher::handleCtrlEvent>(this));
 
         if (l_link) {
             m_laneLinks.push_back(l_link);
@@ -171,8 +171,8 @@ void c_TxnDispatcher::sendRequest(c_TxnReqEvent* x_newReq)
     assert(l_laneIdx < m_laneLinks.size());
 
     #ifdef __SST_DEBUG_OUTPUT__
-    dbg.verbose(CALL_INFO,1,0," Cycle:%lld, LaneIdxPosition:[%d:%d] Addr: 0x%llx LaneIdx: %d\n",
-             m_simCycle,m_laneIdxEnd,m_laneIdxStart,l_addr,l_laneIdx);
+    dbg.verbose(CALL_INFO,1,0," Cycle:%" PRIu64 ", LaneIdxPosition:[%d:%d] Addr: 0x%" PRIx64 " LaneIdx: %" PRIu32 "\n",
+             m_simCycle, m_laneIdxEnd, m_laneIdxStart, l_addr, l_laneIdx);
     #endif
 
     //send the event to a target lane

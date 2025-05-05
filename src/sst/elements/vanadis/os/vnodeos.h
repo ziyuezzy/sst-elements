@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -149,11 +149,11 @@ private:
     virtual void init(unsigned int phase);
     void setup();
     void finish();
-    void handleIncomingSyscall(SST::Event* ev);
+    void handleIncomingSyscallEvent(SST::Event* ev);
     VanadisSyscall* handleIncomingSyscall( OS::ProcessInfo*, VanadisSyscallEvent*, SST::Link* core_link );
     void processSyscallPost( VanadisSyscall* syscall );
 
-    void handleIncomingMemory(StandardMem::Request* ev);
+    void handleIncomingMemoryCallback(StandardMem::Request* ev);
 
     void processOsPageFault( VanadisSyscall*, uint64_t virtAddr, bool isWrite );
 
@@ -358,6 +358,10 @@ public:
     int getPageSize() { return m_pageSize; }
     int getPageShift() { return m_pageShift; }
 
+    uint32_t getNumCores() { return m_coreCount; }
+    uint32_t getNumHwThreads() { return m_hardwareThreadCount; }
+
+
 private:
 
     SST::Output*                output;
@@ -374,6 +378,9 @@ private:
     uint64_t                    m_stack_top;
     int                         m_nodeNum;
     uint64_t                    m_osStartTimeNano;
+    uint32_t                    m_coreCount;
+    uint32_t                    m_hardwareThreadCount;
+    uint32_t                    m_numLogicalCores;
 
     std::queue<PageFault*>                          m_pendingFault;
     std::map<std::string, VanadisELFInfo* >         m_elfMap; 

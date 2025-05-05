@@ -1,5 +1,5 @@
 /**
-Copyright 2009-2024 National Technology and Engineering Solutions of Sandia,
+Copyright 2009-2025 National Technology and Engineering Solutions of Sandia,
 LLC (NTESS).  Under the terms of Contract DE-NA-0003525, the U.S. Government
 retains certain rights in this software.
 
@@ -8,7 +8,7 @@ by National Technology and Engineering Solutions of Sandia, LLC., a wholly
 owned subsidiary of Honeywell International, Inc., for the U.S. Department of
 Energy's National Nuclear Security Administration under contract DE-NA0003525.
 
-Copyright (c) 2009-2024, NTESS
+Copyright (c) 2009-2025, NTESS
 
 All rights reserved.
 
@@ -44,14 +44,16 @@ Questions? Contact sst-macro-help@sandia.gov
 
 #pragma once
 
+#include <list>
 #include <memory>
+#include <utility>
 #include <mercury/common/util.h>
 #include <mercury/common/printable.h>
-#include <mercury/common/serializable.h>
 #include <mercury/common/timestamp.h>
 #include <mercury/common/thread_safe_new.h>
 #include <mercury/components/operating_system_fwd.h>
 #include <mercury/hardware/network/network_message.h>
+#include <sst/core/serialization/serializable.h>
 
 namespace SST::Iris::sumi {
 
@@ -101,9 +103,9 @@ class Message : public SST::Hg::NetworkMessage
 
   std::string toString() const override;
 
-  void serialize_order(SST::Hg::serializer &ser) override;
+  void serialize_order(SST::Core::Serialization::serializer& ser) override;
 
-  void serializeBuffers(SST::Hg::serializer& ser);
+  void serializeBuffers(SST::Core::Serialization::serializer& ser);
 
   static bool needsAck(SST::Hg::NetworkMessage::type_t ty,
                         int sendCQ, int recvCQ);
@@ -293,12 +295,12 @@ class ProtocolMessage : public Message {
   {
   }
 
-  void serialize_order(SST::Hg::serializer& ser) override {
+  void serialize_order(SST::Core::Serialization::serializer& ser) override {
     Message::serialize_order(ser);
-    ser & stage_;
-    ser & protocol_;
-    ser & count_;
-    ser & type_size_;
+    SST_SER(stage_);
+    SST_SER(protocol_);
+    SST_SER(count_);
+    SST_SER(type_size_);
     ser.primitive(partner_buffer_);
   }
 

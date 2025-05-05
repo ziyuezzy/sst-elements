@@ -1,5 +1,5 @@
 /**
-Copyright 2009-2024 National Technology and Engineering Solutions of Sandia,
+Copyright 2009-2025 National Technology and Engineering Solutions of Sandia,
 LLC (NTESS).  Under the terms of Contract DE-NA-0003525, the U.S. Government
 retains certain rights in this software.
 
@@ -8,7 +8,7 @@ by National Technology and Engineering Solutions of Sandia, LLC., a wholly
 owned subsidiary of Honeywell International, Inc., for the U.S. Department of
 Energy's National Nuclear Security Administration under contract DE-NA0003525.
 
-Copyright (c) 2009-2024, NTESS
+Copyright (c) 2009-2025, NTESS
 
 All rights reserved.
 
@@ -81,15 +81,15 @@ Message::tostr(class_t ty)
 }
 
 void
-Message::serialize_order(SST::Hg::serializer &ser)
+Message::serialize_order(SST::Core::Serialization::serializer& ser)
 {
-  ser & arrived_;
-  ser & recv_sync_delay_;
-  ser & sender_;
-  ser & recver_;
-  ser & class_;
-  ser & send_cq_;
-  ser & recv_cq_;
+  SST_SER(arrived_);
+  SST_SER(recv_sync_delay_);
+  SST_SER(sender_);
+  SST_SER(recver_);
+  SST_SER(class_);
+  SST_SER(send_cq_);
+  SST_SER(recv_cq_);
   NetworkMessage::serialize_order(ser);
 }
 

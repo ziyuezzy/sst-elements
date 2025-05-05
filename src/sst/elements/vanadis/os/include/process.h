@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -20,6 +20,8 @@
 #include <sys/mman.h>
 //#include <iostream>
 //#include <fstream>
+
+#include <cstdint>
 
 #include "sst/elements/mmu/mmu.h"
 
@@ -57,7 +59,9 @@ class ProcessInfo {
         m_pageShift = obj.m_pageShift;
         m_ppid = obj.m_pid;
         m_pgid = obj.m_pgid;
-       
+        m_cpusMask = obj.m_cpusMask;
+        m_numLogicalCores = obj.m_numLogicalCores;
+
         m_futex = new Futex;
         m_threadGrp = new ThreadGrp();
         m_threadGrp->add( this, gettid() );
@@ -71,9 +75,9 @@ class ProcessInfo {
         m_fileTable->update( obj.m_fileTable );
     }
 
-    ProcessInfo( MMU_Lib::MMU* mmu, PhysMemManager* physMemMgr, int node, unsigned pid, VanadisELFInfo* elfInfo, int debug_level, unsigned pageSize, Params& params )
+    ProcessInfo( MMU_Lib::MMU* mmu, PhysMemManager* physMemMgr, int node, unsigned pid, VanadisELFInfo* elfInfo, int debug_level, unsigned pageSize, uint32_t numLogicalCores, Params& params )
         : m_mmu(mmu), m_physMemMgr(physMemMgr), m_pid(pid), m_ppid(0), m_pgid(pid), m_tid(pid), m_uid(8000), m_gid(1000),
-          m_elfInfo(elfInfo), m_pageSize(pageSize), m_params(params), m_tidAddress(0)
+          m_elfInfo(elfInfo), m_pageSize(pageSize), m_numLogicalCores(numLogicalCores), m_params(params), m_tidAddress(0)
     {
         uint64_t initial_brk = 0;
         char buffer[100];
@@ -87,6 +91,11 @@ class ProcessInfo {
         m_threadGrp->add( this, gettid() );
         m_virtMemMap = new VirtMemMap;
         m_fileTable = new FileDescriptorTable( 1024 ); 
+
+        m_cpusMask.resize( 128, 0 );
+        for ( size_t i = 0; i < m_numLogicalCores; ++i ) {
+            setLogicalCoreAffinity( i );
+        }
 
         for ( size_t i = 0; i < m_elfInfo->countProgramHeaders(); ++i ) {
 
@@ -129,8 +138,8 @@ class ProcessInfo {
     }
 
     ProcessInfo( SST::Output* output, std::string checkpointDir,
-        MMU_Lib::MMU* mmu, PhysMemManager* physMemMgr, int node, unsigned pid, VanadisELFInfo* elfInfo, int debug_level, unsigned pageSize )
-        : m_mmu(mmu), m_physMemMgr(physMemMgr), m_pid(pid), m_pgid(pid), m_tid(pid), m_elfInfo(elfInfo), m_pageSize(pageSize)
+        MMU_Lib::MMU* mmu, PhysMemManager* physMemMgr, int node, unsigned pid, VanadisELFInfo* elfInfo, int debug_level, unsigned pageSize , uint32_t numLogicalCores)
+        : m_mmu(mmu), m_physMemMgr(physMemMgr), m_pid(pid), m_pgid(pid), m_tid(pid), m_elfInfo(elfInfo), m_pageSize(pageSize), m_numLogicalCores(numLogicalCores)
     {
         std::stringstream filename;
         filename << checkpointDir << "/process-"  << getpid();
@@ -182,6 +191,11 @@ class ProcessInfo {
         
         m_threadGrp = new ThreadGrp;
         m_futex = new Futex;
+
+        m_cpusMask.resize( 128, 0 );
+        for ( size_t i = 0; i < m_numLogicalCores; ++i ) {
+            setLogicalCoreAffinity( i );
+        }
         
         size_t size;
         assert( 1 == fscanf(fp,"m_params.size() %zu\n",&size) );
@@ -189,14 +203,14 @@ class ProcessInfo {
 
         char* tmp = nullptr;
         size_t num = 0;
-        getline( &tmp, &num, fp );
+        (void) !getline( &tmp, &num, fp );
         output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"%s",tmp);
         assert( 0 == strcmp(tmp,"Local params:\n") );
         free(tmp);
 
         for ( auto i = 0; i < size; i++ ) {
             char tmp1[80],tmp2[80];
-            fscanf(fp, "%s %s\n", tmp1, tmp2 );
+            (void) !fscanf(fp, "%s %s\n", tmp1, tmp2 );
             std::string key = tmp1;
             key.erase( key.size() - 1, 1 ); 
             std::string value = tmp2;
@@ -244,7 +258,7 @@ class ProcessInfo {
         fprintf(fp,"m_gid: %d\n",m_gid);
         fprintf(fp,"m_core: %d\n",m_core);
         fprintf(fp,"m_hwThread: %d\n",m_hwThread);
-        fprintf(fp,"m_tidAddress: %#llx\n",m_tidAddress);
+        fprintf(fp,"m_tidAddress: %#" PRIx64 "\n",m_tidAddress);
 
         m_virtMemMap->checkpoint(fp);
         m_fileTable->checkpoint(fp);
@@ -445,6 +459,17 @@ class ProcessInfo {
         return m_fileTable->getPath( handle ); 
     }
 
+    void setAffinity(const std::vector<uint8_t>& mask) { m_cpusMask = mask; }
+    std::vector<uint8_t> getAffinity() const { return m_cpusMask; }
+
+    void setLogicalCoreAffinity(unsigned core) {
+        m_cpusMask[(core / 8)] |= (1 << (core % 8));
+    }
+
+    bool getLogicalCoreAffinity(unsigned core) {
+        return (m_cpusMask[core / 8] & (1 << (core % 8))) != 0;
+    }
+
     Params& getParams() { return m_params; }
     uint64_t getEntryPoint() { return m_elfInfo->getEntryPoint(); }
     VanadisELFInfo* getElfInfo() { return m_elfInfo; }
@@ -481,6 +506,9 @@ class ProcessInfo {
     unsigned m_core;
     unsigned m_hwThread;
     uint64_t m_tidAddress;
+
+    std::vector<uint8_t> m_cpusMask;
+    uint32_t m_numLogicalCores;
 
     MMU_Lib::MMU*           m_mmu;
     PhysMemManager*         m_physMemMgr;

@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -16,24 +16,8 @@
 #pragma once
 
 #ifdef __cplusplus
-
 #include <mercury/common/errors.h>
 #include <mercury/operating_system/process/task_id.h>
-//#include <sprockit/spkt_string.h>
-//#include <sprockit/debug.h>
-
-/** Automatically inherit the errors */
-//using sprockit::IllformedError;
-//using sprockit::InputError;
-//using sprockit::InvalidKeyError;
-//using sprockit::IOError;
-//using sprockit::IteratorError;
-//using sprockit::LibraryError;
-//using sprockit::MemoryError;
-//using sprockit::NullError;
-//using sprockit::OSError;
-//using sprockit::RangeError;
-//using sprockit::SpktError;
 #endif
 
 namespace SST::Hg {

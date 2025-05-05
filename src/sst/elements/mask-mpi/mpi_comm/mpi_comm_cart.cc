@@ -1,5 +1,5 @@
 /**
-Copyright 2009-2024 National Technology and Engineering Solutions of Sandia,
+Copyright 2009-2025 National Technology and Engineering Solutions of Sandia,
 LLC (NTESS).  Under the terms of Contract DE-NA-0003525, the U.S. Government
 retains certain rights in this software.
 
@@ -8,7 +8,7 @@ by National Technology and Engineering Solutions of Sandia, LLC., a wholly
 owned subsidiary of Honeywell International, Inc., for the U.S. Department of
 Energy's National Nuclear Security Administration under contract DE-NA0003525.
 
-Copyright (c) 2009-2024, NTESS
+Copyright (c) 2009-2025, NTESS
 
 All rights reserved.
 
@@ -44,6 +44,8 @@ Questions? Contact sst-macro-help@sandia.gov
 
 #include <mpi_comm/mpi_comm_cart.h>
 #include <mercury/common/errors.h>
+
+#include <memory>
 
 namespace SST::MASKMPI {
 
@@ -96,26 +98,26 @@ MpiCommCart::shift(int dir, int dis)
                      "mpicomm_cart::shift: dir %d is too big for dims %d",
                      dir, dims_.size());
   }
-  int coords[dims_.size()];
-  set_coords(rank_, coords);
+  auto coords = std::make_unique<int[]>(dims_.size());
+  set_coords(rank_, coords.get());
   coords[dir] += dis;
 
   if (coords[dir] >= dims_[dir]) {
     if (periods_[dir]) {
       coords[dir] = coords[dir] % dims_[dir];
-      return rank(coords);
+      return rank(coords.get());
     } else {
       return MpiComm::proc_null;
     }
   } else if (coords[dir] < 0) {
     if (periods_[dir]) {
       coords[dir] = (dims_[dir] + coords[dir]) % dims_[dir];
-      return rank(coords);
+      return rank(coords.get());
     } else {
       return MpiComm::proc_null;
     }
   } else {
-    return rank(coords);
+    return rank(coords.get());
   }
 
 }

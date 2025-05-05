@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -45,13 +45,13 @@ private:
 
     void serialize_order(SST::Core::Serialization::serializer& ser) override {
         VanadisSyscallEvent::serialize_order(ser);
-        ser& fd;
-        ser& op_read;
-        ser& op_write;
-        ser& io_op;
-        ser& io_drv;
-        ser& ptr;
-        ser& ptr_len;
+        SST_SER(fd);
+        SST_SER(op_read);
+        SST_SER(op_write);
+        SST_SER(io_op);
+        SST_SER(io_drv);
+        SST_SER(ptr);
+        SST_SER(ptr_len);
     }
     ImplementSerializable(SST::Vanadis::VanadisSyscallIoctlEvent);
 

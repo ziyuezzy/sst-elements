@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -130,7 +130,7 @@ static int sumi_cntr_close(fid_t fid)
 
 DIRECT_FN STATIC uint64_t sumi_cntr_readerr(struct fid_cntr *cntr)
 {
-	int v, ret;
+	int v = 0, ret = 0;
   struct sumi_fid_cntr *cntr_priv;
 #if 0
 
@@ -150,7 +150,7 @@ DIRECT_FN STATIC uint64_t sumi_cntr_readerr(struct fid_cntr *cntr)
 
 DIRECT_FN STATIC uint64_t sumi_cntr_read(struct fid_cntr *cntr)
 {
-	int v, ret;
+	int v = 0, ret = 0;
 #if 0
   struct sumi_fid_cntr *cntr_priv;
 

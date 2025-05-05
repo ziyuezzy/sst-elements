@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -22,7 +22,6 @@
 #include <mercury/hardware/common/packet.h>
 #include <mercury/hardware/common/recv_cq.h>
 #include <mercury/hardware/common/flow.h>
-//#include <sprockit/output.h>
 
 namespace SST {
 namespace Hg {
@@ -47,7 +46,7 @@ RecvCQ::recv(uint64_t unique_id, uint32_t bytes, Flow* orig)
   incomingMsg& incoming  = bytes_recved_[unique_id];
 #if SST_HG_SANITY_CHECK
   if (incoming.msg && orig){
-    spkt_abort_printf(
+    sst_hg_abort_printf(
         "RecvCQ::recv: only one message chunk should carry the parent payload for %" PRIu64 ": %s",
         unique_id, incoming.msg->toString().c_str());
   }

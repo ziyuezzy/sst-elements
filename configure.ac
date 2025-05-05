@@ -6,7 +6,7 @@
 AC_INIT([SST Elements Library],[-dev],[sst@sandia.gov])
 
 AC_PREREQ([2.59])
-AC_COPYRIGHT([Copyright National Technology and Engineering Solutions of Sandia (NTESS), 2004-2024])
+AC_COPYRIGHT([Copyright National Technology and Engineering Solutions of Sandia (NTESS), 2004-2025])
 
 AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_MACRO_DIR([config])
@@ -15,6 +15,13 @@ AM_INIT_AUTOMAKE([1.9.6 foreign dist-bzip2 subdir-objects no-define tar-pax])
 # If Automake supports silent rules, enable them.
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
+AH_TOP([
+#ifndef _SST_ELEMENT_CONFIG_H_
+#define _SST_ELEMENT_CONFIG_H_
+])
+AH_BOTTOM([
+#endif /* _SST_ELEMENT_CONFIG_H_ */
+])
 AC_CONFIG_HEADERS([src/sst_element_config.h])
 
 m4_include([config/sst_elements_include.m4])
@@ -51,11 +58,21 @@ SST_CHECK_SPINLOCK()
 
 SST_ELEMENT_CONFIG_OUTPUT()
 
+# Check if compiler is clang vs gcc for flags
+AC_LANG_PUSH([C++])
+AX_COMPILER_VENDOR
+AC_LANG_POP([C++])
+case "$ax_cv_cxx_compiler_vendor" in
+    clang) compile_clang=yes ;;
+    *)     compile_clang=no ;;
+esac
+AM_CONDITIONAL([COMPILE_CLANG], [test x$compile_clang = xtrue])
+
 # Compile flags come from SST-Core, add or remove extra warnings
 # depending on the use-picky flag
 SST_CHECK_PICKY
 AS_IF([test "x$use_picky" = "xyes"],
-      [WARNFLAGS="-Wall -Wextra"],
+      [WARNFLAGS="-Wall -Wextra -Wvla"],
       [WARNFLAGS=""])
 AM_CFLAGS="$AM_CFLAGS $WARNFLAGS"
 AM_CXXFLAGS="$AM_CXXFLAGS $WARNFLAGS"

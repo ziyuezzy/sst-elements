@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -197,7 +197,7 @@ DIRECT_FN const char *sumi_av_straddr(struct fid_av *av,
     uint32_t rank = ADDR_RANK(*addr_ptr);
     uint16_t cq = ADDR_CQ(*addr_ptr);
     uint16_t rx = ADDR_QUEUE(*addr_ptr);
-    snprintf(ret, 512, "%" PRIu32 ".%" PRIu16 ".%" PRIu16,
+    snprintf(ret, SUMI_MAX_ADDR_LEN, "%" PRIu32 ".%" PRIu16 ".%" PRIu16,
             rank, cq, rx);
   } else {
     sst_hg_abort_printf("internal error: got addr format that isn't SSTMAC or STR");

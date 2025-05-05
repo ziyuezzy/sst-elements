@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -90,11 +90,6 @@ class Pin3Frontend : public ArielFrontend {
         virtual void finish();
         virtual ArielTunnel* getTunnel();
 
-#ifdef HAVE_CUDA
-        virtual GpuReturnTunnel* getReturnTunnel();
-        virtual GpuDataTunnel* getDataTunnel();
-#endif
-
     private:
 
         int forkPINChild(const char* app, char** args, std::map<std::string, std::string>& app_env, redirect_info_t redirect_info);
@@ -107,14 +102,6 @@ class Pin3Frontend : public ArielFrontend {
         SST::Core::Interprocess::MMAPParent<ArielTunnel>* tunnelmgr;
 
         ArielTunnel* tunnel;
-
-#ifdef HAVE_CUDA
-        SST::Core::Interprocess::MMAPParent<GpuReturnTunnel>* tunnelRmgr;
-        SST::Core::Interprocess::MMAPParent<GpuDataTunnel>* tunnelDmgr;
-
-        GpuReturnTunnel* tunnelR;
-        GpuDataTunnel* tunnelD;
-#endif
 
         std::string appLauncher;
         redirect_info_t redirect_info;

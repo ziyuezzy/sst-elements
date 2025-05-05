@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -14,13 +14,13 @@
 // distribution.
 
 
-#include <sst_config.h>
+#include <sst/core/sst_config.h>
 #include <sst/core/params.h>
+#include <sst/core/interfaces/stringEvent.h>
 
 #include "scratchpad.h"
 #include "membackend/scratchBackendConvertor.h"
 #include "util.h"
-#include <sst/core/interfaces/stringEvent.h>
 #include "memLink.h"
 #include "memNIC.h"
 
@@ -28,14 +28,7 @@ using namespace std;
 using namespace SST;
 using namespace SST::MemHierarchy;
 
-/* Debug macros */
-#ifdef __SST_DEBUG_OUTPUT__ /* From sst-core, enable with --enable-debug */
-#define is_debug_addr(addr) (DEBUG_ADDR.empty() || DEBUG_ADDR.find(addr) != DEBUG_ADDR.end())
-#define is_debug_event(ev) (DEBUG_ADDR.empty() || ev->doDebug(DEBUG_ADDR))
-#else
-#define is_debug_addr(addr) false
-#define is_debug_event(ev) false
-#endif
+/* Debug macros included from util.h */
 
 /*
  *
@@ -161,7 +154,8 @@ Scratchpad::Scratchpad(ComponentId_t id, Params &params) : Component(id) {
             memoryFile.clear();
         }
         try {
-            backing_ = new Backend::BackingMMAP( memoryFile, scratch_->getMemSize() );
+            // TODO fix to match memory controller
+            backing_ = new Backend::BackingMMAP( memoryFile, memoryFile, scratch_->getMemSize() );
         }
         catch ( int e) {
             if (e == 1)
@@ -185,7 +179,7 @@ Scratchpad::Scratchpad(ComponentId_t id, Params &params) : Component(id) {
     directory_ = false;
 
     // Create clock
-    TimeConverter* tc = registerClock(clock_freq, new Clock::Handler<Scratchpad>(this, &Scratchpad::clock));
+    TimeConverter tc = registerClock(clock_freq, new Clock::Handler2<Scratchpad, &Scratchpad::clock>(this));
 
     // Register statistics
     stat_ScratchReadReceived      = registerStatistic<uint64_t>("request_received_scratch_read");
@@ -201,49 +195,76 @@ Scratchpad::Scratchpad(ComponentId_t id, Params &params) : Component(id) {
     // Options: cpu and network; or cpu and memory;
     // cpu is a MoveEvent interface, memory & network are MemEvent interfaces (memory is a direct connect while network uses SimpleNetwork)
     
-    linkUp_ = loadUserSubComponent<MemLinkBase>("cpulink", ComponentInfo::SHARE_NONE, tc);
+    linkUp_ = loadUserSubComponent<MemLinkBase>("highlink", ComponentInfo::SHARE_NONE, &tc);
+    if (!linkUp_) {
+        linkUp_ = loadUserSubComponent<MemLinkBase>("cpulink", ComponentInfo::SHARE_NONE, &tc);
+        if (linkUp_) {
+            out.output("%s, DEPRECATION WARNING: The 'cpulink' subcomponent slot has been renamed to 'highlink' to improve name standardization. Please change this in your input file.\n", getName().c_str());
+        }
+        if (!linkUp_ && isPortConnected("highlink")) {
+            Params p;
+            p.insert("port", "highlink");
+            linkUp_ = loadAnonymousSubComponent<MemLinkBase>("memHierarchy.MemLink", "highlink", 0, ComponentInfo::SHARE_PORTS | ComponentInfo::INSERT_STATS, p, &tc);
+        }
+    }
     if (linkUp_)
-        linkUp_->setRecvHandler(new Event::Handler<Scratchpad>(this, &Scratchpad::processIncomingCPUEvent));
+        linkUp_->setRecvHandler(new Event::Handler2<Scratchpad, &Scratchpad::processIncomingCPUEvent>(this));
 
-    linkDown_ = loadUserSubComponent<MemLinkBase>("memlink", ComponentInfo::SHARE_NONE, tc);
+    linkDown_ = loadUserSubComponent<MemLinkBase>("lowlink", ComponentInfo::SHARE_NONE, &tc);
+    if (!linkDown_) {
+        linkDown_ = loadUserSubComponent<MemLinkBase>("memlink", ComponentInfo::SHARE_NONE, &tc);
+        if (linkDown_) {
+            out.output("%s, DEPRECATION WARNING: The 'memlink' subcomponent slot has been renamed to 'lowlink' to improve name standardization. Please change this in your input file.\n", getName().c_str());
+        }
+        if (!linkDown_ && isPortConnected("lowlink")) {
+            Params p;
+            p.insert("port", "lowlink");
+            linkDown_ = loadAnonymousSubComponent<MemLinkBase>("memHierarchy.MemLink", "lowlink", 0, ComponentInfo::SHARE_PORTS | ComponentInfo::INSERT_STATS, p, &tc);
+        }        
+    }
     if (linkDown_)
-        linkDown_->setRecvHandler(new Event::Handler<Scratchpad>(this, &Scratchpad::processIncomingRemoteEvent));
+        linkDown_->setRecvHandler(new Event::Handler2<Scratchpad, &Scratchpad::processIncomingRemoteEvent>(this));
     
     if (linkUp_ && !linkDown_) {
         linkDown_ = linkUp_;
-        linkDown_->setRecvHandler(new Event::Handler<Scratchpad>(this, &Scratchpad::processIncomingNetworkEvent));
+        linkDown_->setRecvHandler(new Event::Handler2<Scratchpad, &Scratchpad::processIncomingNetworkEvent>(this));
     } else if (linkDown_ && !linkUp_) {
         linkUp_ = linkDown_;
-        linkDown_->setRecvHandler(new Event::Handler<Scratchpad>(this, &Scratchpad::processIncomingNetworkEvent));
+        linkDown_->setRecvHandler(new Event::Handler2<Scratchpad, &Scratchpad::processIncomingNetworkEvent>(this));
     }
 
     if (!linkUp_) {
+        bool highlink = isPortConnected("highlink");
+        bool lowlink = isPortConnected("lowlink");
         bool memoryDirect = isPortConnected("memory");
         bool scratchNetwork = isPortConnected("network");
         bool cpuDirect = isPortConnected("cpu");
-        if (!cpuDirect && !scratchNetwork) {
-            out.fatal(CALL_INFO, -1, "Invalid port configuration (%s): Did not detect port for cpu-side events. Connect either 'cpu' or 'network'\n", getName().c_str());
-        } else if (!memoryDirect && !scratchNetwork) {
-            out.fatal(CALL_INFO, -1, "Invalid port configuration (%s): Did not detect port for memory-side events. Connect either 'memory' or 'network'\n", getName().c_str());
-        } else if (cpuDirect && scratchNetwork && memoryDirect) {
-            out.fatal(CALL_INFO, -1, "Invalid port configuration (%s): Too many connected ports. Connect either 'cpu' or 'network' for cpu-side events and either 'memory' or 'network' for memory-side events\n",
+        if (!cpuDirect && !scratchNetwork && !highlink) {
+            out.fatal(CALL_INFO, -1, "Invalid port configuration (%s): Did not detect port for cpu-side events. Connect either the highlink port or fill the highlink subcomponent slot\n", getName().c_str());
+        } else if (!memoryDirect && !scratchNetwork && !lowlink) {
+            out.fatal(CALL_INFO, -1, "Invalid port configuration (%s): Did not detect port for memory-side events. Connect either the lowlink port or fill the lowlink subcomponent slot\n", getName().c_str());
+        } else if ((cpuDirect || highlink) && scratchNetwork && (memoryDirect || lowlink) ) {
+            out.fatal(CALL_INFO, -1, "Invalid port configuration (%s): Too many connected ports. Connect either the lowlink/highlink ports or fill the lowlink/highlink subcomponent slots\n",
                     getName().c_str());
         }
 
         if (cpuDirect) {
             Params cpulink = params.get_scoped_params("cpulink");
             cpulink.insert("port", "cpu");
-            linkUp_ = loadAnonymousSubComponent<MemLinkBase>("memHierarchy.MemLink", "cpulink", 0, ComponentInfo::SHARE_PORTS | ComponentInfo::INSERT_STATS, cpulink, tc);
-            linkUp_->setRecvHandler(new Event::Handler<Scratchpad>(this, &Scratchpad::processIncomingCPUEvent));
+            linkUp_ = loadAnonymousSubComponent<MemLinkBase>("memHierarchy.MemLink", "highlink", 0, ComponentInfo::SHARE_PORTS | ComponentInfo::INSERT_STATS, cpulink, &tc);
+            linkUp_->setRecvHandler(new Event::Handler2<Scratchpad, &Scratchpad::processIncomingCPUEvent>(this));
+            out.output("%s, DEPRECATION WARNING: The scratchpad's 'cpu' port has been renamed to 'highlink' to improve name standardization. Please change this in your input file.\n", getName().c_str());
         }
         if (memoryDirect) {
             Params memlink = params.get_scoped_params("memlink");
             memlink.insert("port", "memory");
-            linkDown_ = loadAnonymousSubComponent<MemLinkBase>("memHierarchy.MemLink", "memlink", 0, ComponentInfo::SHARE_PORTS | ComponentInfo::INSERT_STATS, memlink, tc);
-            linkDown_->setRecvHandler(new Event::Handler<Scratchpad>(this, &Scratchpad::processIncomingRemoteEvent));
+            linkDown_ = loadAnonymousSubComponent<MemLinkBase>("memHierarchy.MemLink", "lowlink", 0, ComponentInfo::SHARE_PORTS | ComponentInfo::INSERT_STATS, memlink, &tc);
+            linkDown_->setRecvHandler(new Event::Handler2<Scratchpad, &Scratchpad::processIncomingRemoteEvent>(this));
+            out.output("%s, DEPRECATION WARNING: The scratchpad's 'memory' port has been renamed to 'lowlink' to improve name standardization. Please change this in your input file.\n", getName().c_str());
         }
 
         if (scratchNetwork) {
+            out.output("%s, DEPRECATION WARNING: Use of the scratchpad's 'network' port is deprecated. Instead, fill the 'highlink' and/or 'lowlink' subcomponent slots with 'memHierarchy.MemNIC' and connect the MemNIC's port to the network.\n", getName().c_str());
             // Fix up parameters for nic params & warn that we're doing it
             if (fixupParam(params, "network_bw", "memNIC.network_bw"))
                 out.output(CALL_INFO, "Note (%s): Changed 'network_bw' to 'memNIC.network_bw' in params. Change your input file to remove this notice.\n", getName().c_str());
@@ -264,15 +285,15 @@ Scratchpad::Scratchpad(ComponentId_t id, Params &params) : Component(id) {
             nicParams.insert("group", "3", false); // 3 is the default for anything that talks to memory but this can be set by user too so don't overwrite
 
             if (!memoryDirect) { /* Connect mem side to network */
-                linkDown_ = loadAnonymousSubComponent<MemLinkBase>("memHierarchy.MemNIC", "memlink", 0, ComponentInfo::SHARE_PORTS | ComponentInfo::INSERT_STATS, nicParams, tc);
-                linkDown_->setRecvHandler(new Event::Handler<Scratchpad>(this, &Scratchpad::processIncomingRemoteEvent));
+                linkDown_ = loadAnonymousSubComponent<MemLinkBase>("memHierarchy.MemNIC", "lowlink", 0, ComponentInfo::SHARE_PORTS | ComponentInfo::INSERT_STATS, nicParams, &tc);
+                linkDown_->setRecvHandler(new Event::Handler2<Scratchpad, &Scratchpad::processIncomingRemoteEvent>(this));
                 if (!cpuDirect) {
                     linkUp_ = linkDown_; /* Connect cpu side to same network */
-                    linkDown_->setRecvHandler(new Event::Handler<Scratchpad>(this, &Scratchpad::processIncomingNetworkEvent));
+                    linkDown_->setRecvHandler(new Event::Handler2<Scratchpad, &Scratchpad::processIncomingNetworkEvent>(this));
                 }
             } else {
-                linkUp_ = loadAnonymousSubComponent<MemLinkBase>("memHierarchy.MemNIC", "cpulink", 0, ComponentInfo::SHARE_PORTS | ComponentInfo::INSERT_STATS, nicParams, tc);
-                linkUp_->setRecvHandler(new Event::Handler<Scratchpad>(this, &Scratchpad::processIncomingCPUEvent));
+                linkUp_ = loadAnonymousSubComponent<MemLinkBase>("memHierarchy.MemNIC", "highlink", 0, ComponentInfo::SHARE_PORTS | ComponentInfo::INSERT_STATS, nicParams, &tc);
+                linkUp_->setRecvHandler(new Event::Handler2<Scratchpad, &Scratchpad::processIncomingCPUEvent>(this));
             }
         }
     }
@@ -364,7 +385,7 @@ void Scratchpad::processIncomingNetworkEvent(SST::Event* event) {
 void Scratchpad::processIncomingCPUEvent(SST::Event* event) {
     MemEventBase * ev = static_cast<MemEventBase*>(event);
 
-    if (is_debug_event(ev))
+    if (mem_h_is_debug_event(ev))
         dbg.debug(_L3_, "E: %-20" PRIu64 " %-20" PRIu64 " %-20s Event:New     (%s)\n",
                 getCurrentSimCycle(), timestamp_, getName().c_str(), ev->getVerboseString(dlevel).c_str());
 
@@ -411,7 +432,7 @@ void Scratchpad::processIncomingCPUEvent(SST::Event* event) {
 void Scratchpad::processIncomingRemoteEvent(SST::Event * event) {
     MemEvent * ev = static_cast<MemEvent*>(event);
 
-    if (is_debug_event(ev))
+    if (mem_h_is_debug_event(ev))
         dbg.debug(_L3_, "E: %-20" PRIu64 " %-20" PRIu64 " %-20s Event:New     (%s)\n",
                 getCurrentSimCycle(), timestamp_, getName().c_str(), ev->getVerboseString(dlevel).c_str());
 
@@ -447,7 +468,7 @@ bool Scratchpad::clock(Cycle_t cycle) {
     while (!procMsgQueue_.empty() && procMsgQueue_.begin()->first < timestamp_) {
         MemEventBase * sendEv = procMsgQueue_.begin()->second;
 
-        if (is_debug_event(sendEv)) {
+        if (mem_h_is_debug_event(sendEv)) {
             debug = true;
             dbg.debug(_L4_, "E: %-20" PRIu64 " %-20" PRIu64 " %-20s Event:Send    (%s)\n",
                     getCurrentSimCycle(), timestamp_, getName().c_str(), sendEv->getBriefString().c_str());
@@ -463,7 +484,7 @@ bool Scratchpad::clock(Cycle_t cycle) {
         MemEvent * sendEv = memMsgQueue_.begin()->second;
         sendEv->setDst(linkDown_->getTargetDestination(sendEv->getBaseAddr()));
 
-        if (is_debug_event(sendEv)) {
+        if (mem_h_is_debug_event(sendEv)) {
             debug = true;
             dbg.debug(_L4_, "E: %-20" PRIu64 " %-20" PRIu64 " %-20s Event:Send    (%s)\n",
                     getCurrentSimCycle(), timestamp_, getName().c_str(), sendEv->getBriefString().c_str());
@@ -527,7 +548,7 @@ void Scratchpad::handleScratchRead(MemEvent * ev) {
     Addr addr = ev->getBaseAddr();
     stat_ScratchReadReceived->addData(1);
 
-    if (is_debug_addr(addr))
+    if (mem_h_is_debug_addr(addr))
         eventDI.prefill(ev->getID(), ev->getCmd(), addr);
 
     MemEvent * response = ev->makeResponse();
@@ -548,17 +569,17 @@ void Scratchpad::handleScratchRead(MemEvent * ev) {
         if (caching_ && !ev->queryFlag(MemEvent::F_NONCACHEABLE)) {
             cacheStatus_.at(ev->getBaseAddr()/scratchLineSize_) = true;
         }
-        if (is_debug_addr(addr))
+        if (mem_h_is_debug_addr(addr))
             eventDI.action = "ScrRead";
     } else {
         mshr_.find(ev->getBaseAddr())->second.push_back(MSHREntry(ev->getID(), Command::GetS, read));
-        if (is_debug_addr(addr)) {
+        if (mem_h_is_debug_addr(addr)) {
             eventDI.action = "stall";
             eventDI.reason = "MSHR conflict";
         }
     }
 
-    if (is_debug_event(ev)) {
+    if (mem_h_is_debug_event(ev)) {
         dbg.debug(_L10_, "M: %-20" PRIu64 " %-20" PRIu64 " %-20s MSHR:InsEv    0x%-16" PRIx64 " %s\n",
                 getCurrentSimCycle(), timestamp_, getName().c_str(), ev->getBaseAddr(), mshr_.find(ev->getBaseAddr())->second.back().getString().c_str());
     }
@@ -581,7 +602,7 @@ void Scratchpad::handleScratchRead(MemEvent * ev) {
 void Scratchpad::handleScratchWrite(MemEvent * ev) {
     Addr addr = ev->getBaseAddr();
 
-    if (is_debug_addr(addr))
+    if (mem_h_is_debug_addr(addr))
         eventDI.prefill(ev->getID(), ev->getCmd(), addr);
 
     bool doWrite = false; // Decide whether to handle this write immediately EVEN if a conflict
@@ -647,7 +668,7 @@ void Scratchpad::handleScratchWrite(MemEvent * ev) {
                     outstandingEventList_.insert(std::make_pair(ev->getID(),OutstandingEvent(ev,response)));
                     it = entry->insert(it, MSHREntry(ev->getID(), Command::GetX, write));
 
-                    if (is_debug_event(ev))
+                    if (mem_h_is_debug_event(ev))
                         dbg.debug(_L10_, "M: %-20" PRIu64 " %-20" PRIu64 " %-20s MSHR:InsEv    0x%-16" PRIx64 " %s\n",
                                 getCurrentSimCycle(), timestamp_, getName().c_str(), ev->getBaseAddr(), it->getString().c_str());
                 }
@@ -668,7 +689,7 @@ void Scratchpad::handleScratchWrite(MemEvent * ev) {
         outstandingEventList_.insert(std::make_pair(ev->getID(),OutstandingEvent(ev,response)));
         mshr_.find(ev->getBaseAddr())->second.push_back(MSHREntry(ev->getID(), Command::GetX, write));
 
-        if (is_debug_event(ev))
+        if (mem_h_is_debug_event(ev))
             dbg.debug(_L10_, "M: %-20" PRIu64 " %-20" PRIu64 " %-20s MSHR:InsEv    0x%-16" PRIx64 " %s\n",
                         getCurrentSimCycle(), timestamp_, getName().c_str(), ev->getBaseAddr(), mshr_.find(ev->getBaseAddr())->second.back().getString().c_str());
     }
@@ -708,7 +729,7 @@ void Scratchpad::handleScratchGet(MemEventBase * event) {
     remoteRead->setInstructionPointer(ev->getInstructionPointer());
     responseIDMap_.insert(std::make_pair(remoteRead->getID(), ev->getID()));
 
-    if (is_debug_event(remoteRead)) {
+    if (mem_h_is_debug_event(remoteRead)) {
         dbg.debug(_L10_, "C: %-20" PRIu64 " %-20" PRIu64 " %-20s Get           0x%-16" PRIx64 " 0x%-16" PRIx64 " Remote Read (<%" PRIu64 ", %" PRIu32 ">, 0x%" PRIx64 ")\n",
                 getCurrentSimCycle(), timestamp_, getName().c_str(), saddr, daddr, remoteRead->getID().first, remoteRead->getID().second, remoteRead->getBaseAddr());
     }
@@ -728,7 +749,7 @@ void Scratchpad::handleScratchGet(MemEventBase * event) {
             mshr_.find(baseAddr)->second.push_back(MSHREntry(ev->getID(), Command::Get, true));
         }
 
-        if (is_debug_addr(baseAddr))
+        if (mem_h_is_debug_addr(baseAddr))
             dbg.debug(_L10_, "M: %-20" PRIu64 " %-20" PRIu64 " %-20s MSHR:InsEv    0x%-16" PRIx64 " %s\n",
                     getCurrentSimCycle(), timestamp_, getName().c_str(), baseAddr, mshr_.find(baseAddr)->second.back().getString().c_str());
 
@@ -779,7 +800,7 @@ void Scratchpad::handleScratchPut(MemEventBase * event) {
             mshr_.find(baseAddr)->second.push_back(MSHREntry(ev->getID(), Command::Put));
         }
 
-        if (is_debug_addr(baseAddr))
+        if (mem_h_is_debug_addr(baseAddr))
             dbg.debug(_L10_, "M: %-20" PRIu64 " %-20" PRIu64 " %-20s MSHR:InsEv    0x%-16" PRIx64 " %s\n",
                     getCurrentSimCycle(), timestamp_, getName().c_str(),
                     baseAddr, mshr_.find(baseAddr)->second.back().getString().c_str());
@@ -807,7 +828,7 @@ void Scratchpad::handleScratchResponse(SST::Event::id_type responseID) {
     Addr baseAddr = responseIDAddrMap_.find(responseID)->second;
     responseIDAddrMap_.erase(responseID);
 
-    if (is_debug_addr(baseAddr))
+    if (mem_h_is_debug_addr(baseAddr))
         dbg.debug(_L5_, "C: %-20" PRIu64 " %-20" PRIu64 " %-20s Scratch:Recv  0x%-16" PRIx64 " <%" PRIu64 ", %" PRIu32 ">\n",
                 getCurrentSimCycle(), timestamp_, getName().c_str(), baseAddr, responseID.first, responseID.second);
 
@@ -839,7 +860,7 @@ void Scratchpad::handleAckInv(MemEventBase * event) {
     MoveEvent * request = static_cast<MoveEvent*>(outstandingEventList_.find(requestID)->second.request);
 
     /* Update cache status */
-    if (is_debug_addr(baseAddr))
+    if (mem_h_is_debug_addr(baseAddr))
         dbg.debug(_L9_, "C: %-20" PRIu64 " %-20" PRIu64 " %-20s UpdCache   0x%-16" PRIx64 "  Uncached\n",
                 getCurrentSimCycle(), timestamp_, getName().c_str(), baseAddr);
 
@@ -848,7 +869,7 @@ void Scratchpad::handleAckInv(MemEventBase * event) {
     if (entry->cmd == Command::Get) {
         entry->needAck = false;
 
-        if (is_debug_addr(baseAddr))
+        if (mem_h_is_debug_addr(baseAddr))
             dbg.debug(_L10_, "M: %-20" PRIu64 " %-20" PRIu64 " %-20s MSHR:Update   0x%-16" PRIx64 " %s\n",
                     getCurrentSimCycle(), timestamp_, getName().c_str(), baseAddr, entry->getString().c_str());
 
@@ -862,7 +883,7 @@ void Scratchpad::handleAckInv(MemEventBase * event) {
         entry->needAck = false;
         entry->needData = true;
 
-        if (is_debug_addr(baseAddr)) {
+        if (mem_h_is_debug_addr(baseAddr)) {
             dbg.debug(_L10_, "M: %-20" PRIu64 " %-20" PRIu64 " %-20s MSHR:Update   0x%-16" PRIx64 " %s\n",
                     getCurrentSimCycle(), timestamp_, getName().c_str(), baseAddr, entry->getString().c_str());
         }
@@ -1062,7 +1083,7 @@ void Scratchpad::handleRemoteGetResponse(MemEvent * response, SST::Event::id_typ
             doScratchWrite(write);
             mshr_.find(baseAddr)->second.front().needData = false;
 
-            if (is_debug_addr(baseAddr))
+            if (mem_h_is_debug_addr(baseAddr))
                 dbg.debug(_L10_, "M: %-20" PRIu64 " %-20" PRIu64 " %-20s MSHR:Update   0x%-16" PRIx64 " %s\n",
                         getCurrentSimCycle(), timestamp_, getName().c_str(), baseAddr, mshr_.find(baseAddr)->second.front().getString().c_str());
 
@@ -1080,7 +1101,7 @@ void Scratchpad::handleRemoteGetResponse(MemEvent * response, SST::Event::id_typ
                     it->scratch = write;
                     it->needData = false;
 
-                    if (is_debug_addr(baseAddr))
+                    if (mem_h_is_debug_addr(baseAddr))
                         dbg.debug(_L10_, "M: %-20" PRIu64 " %-20" PRIu64 " %-20s MSHR:Update   0x%-16" PRIx64 " %s\n",
                                 getCurrentSimCycle(), timestamp_, getName().c_str(), baseAddr, mshr_.find(baseAddr)->second.front().getString().c_str());
                 }
@@ -1117,7 +1138,7 @@ void Scratchpad::updateMSHR(Addr baseAddr) {
             std::vector<uint8_t> readData = doScratchRead(entry->scratch);
             static_cast<MemEvent*>(outstandingEventList_.find(entry->id)->second.response)->setPayload(readData);
 
-            if (is_debug_addr(baseAddr))
+            if (mem_h_is_debug_addr(baseAddr))
                 dbg.debug(_L10_, "M: %-20" PRIu64 " %-20" PRIu64 " %-20s MSHR:Update   0x%-16" PRIx64 " %s\n",
                         getCurrentSimCycle(), timestamp_, getName().c_str(), baseAddr, entry->getString().c_str());
 
@@ -1130,7 +1151,7 @@ void Scratchpad::updateMSHR(Addr baseAddr) {
             finishRequest(entry->id);
             mshr_.find(baseAddr)->second.pop_front();
 
-            if (is_debug_addr(baseAddr))
+            if (mem_h_is_debug_addr(baseAddr))
                 dbg.debug(_L10_, "M: %-20" PRIu64 " %-20" PRIu64 " %-20s MSHR:Remove   0x%-16" PRIx64 "\n",
                         getCurrentSimCycle(), timestamp_, getName().c_str(), baseAddr);
 
@@ -1144,11 +1165,11 @@ void Scratchpad::updateMSHR(Addr baseAddr) {
                 updateGet(entry->id);
                 mshr_.find(baseAddr)->second.pop_front();
 
-                if (is_debug_addr(baseAddr))
+                if (mem_h_is_debug_addr(baseAddr))
                     dbg.debug(_L10_, "M: %-20" PRIu64 " %-20" PRIu64 " %-20s MSHR:Remove   0x%-16" PRIx64 "\n",
                             getCurrentSimCycle(), timestamp_, getName().c_str(), baseAddr);
             } else {
-                if (is_debug_addr(baseAddr))
+                if (mem_h_is_debug_addr(baseAddr))
                     dbg.debug(_L10_, "M: %-20" PRIu64 " %-20" PRIu64 " %-20s MSHR:Remove   0x%-16" PRIx64 "\n",
                             getCurrentSimCycle(), timestamp_, getName().c_str(), baseAddr);
 
@@ -1158,7 +1179,7 @@ void Scratchpad::updateMSHR(Addr baseAddr) {
             entry->needAck = startPut(baseAddr, static_cast<MoveEvent*>(outstandingEventList_.find(entry->id)->second.request));
             entry->needData = !entry->needAck;
 
-            if (is_debug_addr(baseAddr))
+            if (mem_h_is_debug_addr(baseAddr))
                 dbg.debug(_L10_, "M: %-20" PRIu64 " %-20" PRIu64 " %-20s MSHR:Remove   0x%-16" PRIx64 "\n",
                         getCurrentSimCycle(), timestamp_, getName().c_str(), baseAddr);
 
@@ -1172,7 +1193,7 @@ void Scratchpad::updateMSHR(Addr baseAddr) {
     if (mshr_.find(baseAddr)->second.empty()) {
         mshr_.erase(baseAddr);
 
-        if (is_debug_addr(baseAddr))
+        if (mem_h_is_debug_addr(baseAddr))
             dbg.debug(_L10_, "M: %-20" PRIu64 " %-20" PRIu64 " %-20s MSHR:Erase    0x%-16" PRIx64 "\n", getCurrentSimCycle(), timestamp_, getName().c_str(), baseAddr);
     }
 }

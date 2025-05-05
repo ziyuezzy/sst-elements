@@ -9,7 +9,7 @@ AM_CPPFLAGS += \
 # unpleasant hack to make vintage automake (e.g. 1.13.4) work
 AM_LIBTOOLFLAGS = --tag=CXX
 
-comp_LTLIBRARIES = libhg.la libsystemapi.la ostest.la
+comp_LTLIBRARIES = libhg.la libsystemlibrary.la libcomputelibrary.la ostest.la
 compdir = $(pkglibdir)
 
 libhg_la_SOURCES = \
@@ -23,17 +23,24 @@ libhg_la_SOURCES = \
   common/connection.cc \
   components/nic.cc \
   components/node.cc \
+  components/node_base.cc \
+  components/node_CL.cc \
   components/operating_system.cc \
+  components/operating_system_base.cc \
+  components/operating_system_CL.cc \
   hardware/common/packet.cc \
   hardware/common/recv_cq.cc \
   hardware/network/network_message.cc \
+  libraries/compute/compute_scheduler.cc \
+  libraries/compute/instruction_processor.cc \
+  libraries/compute/memory_model.cc \
   operating_system/launch/app_launch_request.cc \
   operating_system/launch/app_launcher.cc \
-  operating_system/libraries/api.cc \
   operating_system/libraries/library.cc \
+  operating_system/libraries/event_library.cc \
   operating_system/libraries/unblock_event.cc \
   operating_system/process/app.cc \
-  operating_system/process/simple_compute_scheduler.cc \
+  operating_system/process/global.cc \
   operating_system/process/loadlib.cc \
   operating_system/process/progress_queue.cc \
   operating_system/process/thread.cc \
@@ -76,8 +83,14 @@ if SST_HG_A64
 endif
 endif
 
-libsystemapi_la_SOURCES = \
-  libraries/system/system_api.cc
+libsystemlibrary_la_SOURCES = \
+  libraries/system/system_library.cc
+
+libcomputelibrary_la_SOURCES = \
+  libraries/compute/compute_library.cc
+#  libraries/compute/compute_scheduler.cc \
+#  libraries/compute/instruction_processor.cc \
+#  libraries/compute/memory_model.cc
 
 ostest_la_SOURCES = \
   tests/ostest.cc
@@ -95,13 +108,13 @@ nobase_library_include_HEADERS = \
   common/event_handler.h \
   common/factory.h \
   common/node_address.h \
-  common/serializable.h \
   common/stl_string.h \
   common/thread_lock.h \
   common/thread_safe_int.h \
   common/thread_safe_new.h \
   common/output.h \
   common/skeleton.h \
+  common/skeleton_tls.h \
   common/printable.h \
   common/allocator.h \
   common/request_fwd.h \
@@ -116,8 +129,15 @@ nobase_library_include_HEADERS = \
   components/nic_fwd.h \
   components/node.h \
   components/node_fwd.h \
+  components/node_base.h \
+  components/node_base_fwd.h \
+  components/node_CL.h \
+  components/node_CL_fwd.h \
+  components/operating_system_base.h \
   components/operating_system.h \
   components/operating_system_fwd.h \
+  components/operating_system_CL.h \
+  components/operating_system_CL_fwd.h \
   external/json.hpp \
   hardware/network/network_id.h \
   hardware/network/network_message.h \
@@ -128,25 +148,24 @@ nobase_library_include_HEADERS = \
   hardware/common/flow.h \
   hardware/common/packet_fwd.h \
   libraries/system/system_api.h \
+  libraries/system/system_library.h \
   libraries/system/replacements/unistd.h \
-  libraries/compute/lib_compute_time.h \
-  libraries/compute/lib_compute_inst.h \
-  libraries/compute/lib_compute.h \
   libraries/compute/compute_api.h \
-  libraries/compute/lib_compute_fwd.h \
-  libraries/compute/lib_hybrid_compute.h \
   libraries/compute/compute_event.h \
-  libraries/compute/lib_compute_memmove.h \
-  libraries/compute/compute_event_fwd.h \
+  libraries/compute/compute_library.h \
+  libraries/compute/compute_scheduler.h \
+  libraries/compute/compute_scheduler_api.h \
+  libraries/compute/instruction_processor.h \
+  libraries/compute/memory_model.h \
   operating_system/launch/app_launcher.h \
   operating_system/launch/app_launcher_fwd.h \
   operating_system/launch/app_launch_request.h \
-  operating_system/libraries/library_fwd.h \
+  operating_system/libraries/event_library_fwd.h \
   operating_system/libraries/service_fwd.h \
-  operating_system/libraries/library.h \
+  operating_system/libraries/event_library.h \
   operating_system/libraries/service.h \
-  operating_system/libraries/api.h \
-  operating_system/libraries/api_fwd.h \
+  operating_system/libraries/library.h \
+  operating_system/libraries/library_fwd.h \
   operating_system/libraries/unblock_event.h \
   operating_system/threading/context_util.h \
   operating_system/threading/thread_lock.h \
@@ -154,17 +173,17 @@ nobase_library_include_HEADERS = \
   operating_system/threading/stack_alloc_chunk.h \
   operating_system/threading/threading_interface.h \
   operating_system/threading/sim_thread_lock.h \
+  operating_system/process/global.h \
+  operating_system/process/cppglobal.h \
   operating_system/process/tls.h \
   operating_system/process/process_context.h \
   operating_system/process/software_id.h \
   operating_system/process/app.h \
-  operating_system/process/compute_scheduler_fwd.h \
   operating_system/process/thread_fwd.h \
   operating_system/process/thread_info.h \
-  operating_system/process/compute_scheduler.h \
   operating_system/process/thread.h \
-  operating_system/process/simple_compute_scheduler.h \
   operating_system/process/loadlib.h \
+  operating_system/process/memoize.h \
   operating_system/process/progress_queue.h \
   operating_system/process/thread_id.h \
   operating_system/process/app_id.h \
@@ -190,7 +209,8 @@ endif
 
 
 libhg_la_LDFLAGS = -module -avoid-version
-libsystemapi_la_LDFLAGS = -module -avoid-version
+libsystemlibrary_la_LDFLAGS = -module -avoid-version
+libcomputelibrary_la_LDFLAGS = -module -avoid-version
 ostest_la_LDFLAGS = -module -avoid-version
 
 install-exec-hook:

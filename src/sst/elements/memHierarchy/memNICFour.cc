@@ -1,8 +1,8 @@
-// Copyright 2013-2024 NTESS. Under the terms
+// Copyright 2013-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2013-2024, NTESS
+// Copyright (c) 2013-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -14,7 +14,7 @@
 // distribution.
 
 #include <array>
-#include <sst_config.h>
+#include <sst/core/sst_config.h>
 
 #include "sst/elements/memHierarchy/memNICFour.h"
 
@@ -22,14 +22,7 @@ using namespace SST;
 using namespace SST::MemHierarchy;
 using namespace SST::Interfaces;
 
-/* Debug macros */
-#ifdef __SST_DEBUG_OUTPUT__ /* From sst-core, enable with --enable-debug */
-#define is_debug_addr(addr) (DEBUG_ADDR.empty() || DEBUG_ADDR.find(addr) != DEBUG_ADDR.end())
-#define is_debug_event(ev) (DEBUG_ADDR.empty() || ev->doDebug(DEBUG_ADDR))
-#else
-#define is_debug_addr(addr) false
-#define is_debug_event(ev) false
-#endif
+/* Debug macros included from util.h */
 
 /* Constructor */
 
@@ -38,8 +31,8 @@ MemNICFour::MemNICFour(ComponentId_t id, Params &params, TimeConverter* tc) : Me
     std::array<std::string,4> pref = {"req", "ack", "fwd", "data"};
 
     clockOn = true;
-    clockHandler = new Clock::Handler<MemNICFour>(this, &MemNICFour::clock);
-    clockTC = registerClock(tc, clockHandler);
+    clockHandler = new Clock::Handler2<MemNICFour, &MemNICFour::clock>(this);
+    clockTC = registerClock(*tc, clockHandler);
 
     for (int i = 0; i < 4; i++) {
         link_control[i] = loadUserSubComponent<SST::Interfaces::SimpleNetwork>(pref[i], ComponentInfo::SHARE_NONE, 1);
@@ -60,10 +53,10 @@ MemNICFour::MemNICFour(ComponentId_t id, Params &params, TimeConverter* tc) : Me
 
     // Set link control to call recvNotify on event receive
 
-    link_control[REQ]->setNotifyOnReceive(new SimpleNetwork::Handler<MemNICFour>(this, &MemNICFour::recvNotifyReq));
-    link_control[ACK]->setNotifyOnReceive(new SimpleNetwork::Handler<MemNICFour>(this, &MemNICFour::recvNotifyAck));
-    link_control[FWD]->setNotifyOnReceive(new SimpleNetwork::Handler<MemNICFour>(this, &MemNICFour::recvNotifyFwd));
-    link_control[DATA]->setNotifyOnReceive(new SimpleNetwork::Handler<MemNICFour>(this, &MemNICFour::recvNotifyData));
+    link_control[REQ]->setNotifyOnReceive(new SimpleNetwork::Handler2<MemNICFour, &MemNICFour::recvNotifyReq>(this));
+    link_control[ACK]->setNotifyOnReceive(new SimpleNetwork::Handler2<MemNICFour, &MemNICFour::recvNotifyAck>(this));
+    link_control[FWD]->setNotifyOnReceive(new SimpleNetwork::Handler2<MemNICFour, &MemNICFour::recvNotifyFwd>(this));
+    link_control[DATA]->setNotifyOnReceive(new SimpleNetwork::Handler2<MemNICFour, &MemNICFour::recvNotifyData>(this));
 
     // Register statistics
     stat_oooEvent[REQ] = registerStatistic<uint64_t>("outoforder_req_events");
@@ -77,8 +70,10 @@ MemNICFour::MemNICFour(ComponentId_t id, Params &params, TimeConverter* tc) : Me
 
     // TimeBase for statistics
     std::string timebase = params.find<std::string>("clock", "1GHz", found);
-    if (found)
-        setDefaultTimeBase(getTimeConverter(timebase));
+    if (found) {
+        TimeConverter param_tc = getTimeConverter(timebase);
+        setDefaultTimeBase(param_tc);
+    }
 }
 
 void MemNICFour::init(unsigned int phase) {
@@ -107,6 +102,15 @@ void MemNICFour::setup() {
         recvTags[it->addr] = 0;
         sendTags[it->addr] = 0;
     }
+}
+
+void MemNICFour::complete(unsigned int phase) {
+    link_control[REQ]->complete(phase);
+    link_control[ACK]->complete(phase);
+    link_control[FWD]->complete(phase);
+    link_control[DATA]->complete(phase);
+
+    MemNICBase::nicComplete(link_control[DATA], phase);
 }
 
 
@@ -151,7 +155,7 @@ void MemNICFour::send(MemEventBase *ev) {
     req->size_in_bits = getSizeInBits(ev, net);
     req->givePayload(omre);
 
-    if (is_debug_event(ev)) {
+    if (mem_h_is_debug_event(ev)) {
         std::string netstr = "data";
         if (net == REQ) netstr = "req ";
         else if (net == ACK) netstr = "ack ";
@@ -169,6 +173,9 @@ void MemNICFour::send(MemEventBase *ev) {
     }
 }
 
+void MemNICFour::sendUntimedData(MemEventInit* ev, bool broadcast, bool lookup_dst) {
+    MemNICBase::sendUntimedData(ev, broadcast, lookup_dst, link_control[DATA]);
+}
 
 /*
  * Event handler called by link control on event receive
@@ -243,7 +250,7 @@ void MemNICFour::recvNotify(OrderedMemRtrEvent* mre) {
 
     if (!me) return;
 
-    if (is_debug_event(me)) {
+    if (mem_h_is_debug_event(me)) {
         dbg.debug(_L3_, "%s, memNIC notify parent: src: %s. cmd: %s\n",
                 getName().c_str(), me->getSrc().c_str(), CommandString[(int)me->getCmd()]);
     }

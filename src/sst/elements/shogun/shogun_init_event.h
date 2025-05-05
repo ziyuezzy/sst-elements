@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -59,9 +59,9 @@ namespace Shogun {
         void serialize_order(SST::Core::Serialization::serializer& ser) override
         {
             Event::serialize_order(ser);
-            ser& port_count;
-            ser& netID;
-            ser& queue_slots;
+            SST_SER(port_count);
+            SST_SER(netID);
+            SST_SER(queue_slots);
         }
 
         ImplementSerializable(SST::Shogun::ShogunInitEvent);

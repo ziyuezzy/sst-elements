@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -67,16 +67,16 @@ public:
             if ( MEM_TRANSACTION_LLSC_STORE == accessT ) { isa_fp_regs_out[0] = valueReg; }
         } break;
         }
-        
+
     }
 
-    VanadisStoreInstruction* clone() { return new VanadisStoreInstruction(*this); }
+    VanadisStoreInstruction* clone() override { return new VanadisStoreInstruction(*this); }
 
     virtual bool isPartialStore() { return false; }
 
     VanadisMemoryTransaction getTransactionType() const  { return memAccessType; }
 
-    virtual VanadisFunctionalUnitType getInstFuncType() const { return INST_STORE; }
+    virtual VanadisFunctionalUnitType getInstFuncType() const override { return INST_STORE; }
 
     virtual const char* getInstCode() const override
     {
@@ -180,8 +180,8 @@ public:
         assert(0); // stop compiler "warning: control reaches end of non-void function [-Wreturn-type]"
     }
 
-    virtual void markExecuted() 
-    { 
+    virtual void markExecuted() override
+    {
         hasExecuted = true;
     }
 

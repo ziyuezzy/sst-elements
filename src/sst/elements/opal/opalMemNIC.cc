@@ -1,8 +1,8 @@
-// Copyright 2013-2024 NTESS. Under the terms
+// Copyright 2013-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2013-2024, NTESS
+// Copyright (c) 2013-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -38,7 +38,7 @@ OpalMemNIC::OpalMemNIC(ComponentId_t id, Params &params, TimeConverter* tc) : SS
         std::string lcSub = params.find<std::string>("linkcontrol", "merlin.linkcontrol");
         link_control = loadAnonymousSubComponent<SST::Interfaces::SimpleNetwork>(lcSub, "linkcontrol", 0, ComponentInfo::SHARE_PORTS | ComponentInfo::INSERT_STATS, lcparams, 1);
     }
-    link_control->setNotifyOnReceive(new SST::Interfaces::SimpleNetwork::Handler<OpalMemNIC>(this, &OpalMemNIC::recvNotify));
+    link_control->setNotifyOnReceive(new SST::Interfaces::SimpleNetwork::Handler2<OpalMemNIC,&OpalMemNIC::recvNotify>(this));
 
     packetHeaderBytes = extractPacketHeaderSize(params, "min_packet_size");
 }
@@ -75,6 +75,10 @@ void OpalMemNIC::send(MemHierarchy::MemEventBase * ev) {
     req->vn = 0;
     req->givePayload(mre);
     sendQueue.push(req);
+}
+
+void OpalMemNIC::sendUntimedData(MemHierarchy::MemEventInit* ev, bool broadcast = true, bool lookup_dst = true) {
+    MemNICBase::sendUntimedData(ev, broadcast, lookup_dst, link_control);
 }
 
 

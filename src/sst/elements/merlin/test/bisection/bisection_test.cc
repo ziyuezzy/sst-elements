@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -86,14 +86,14 @@ bisection_test::bisection_test(ComponentId_t cid, Params& params) :
 
 
     // Set up a receive functor that will handle all incoming packets
-    link_control->setNotifyOnReceive(new SST::Interfaces::SimpleNetwork::Handler<bisection_test>(this,&bisection_test::receive_handler));
+    link_control->setNotifyOnReceive(new SST::Interfaces::SimpleNetwork::Handler2<bisection_test,&bisection_test::receive_handler>(this));
 
     // Set up a send functor that will handle sending packets
-    link_control->setNotifyOnSend(new SST::Interfaces::SimpleNetwork::Handler<bisection_test>(this,&bisection_test::send_handler));
+    link_control->setNotifyOnSend(new SST::Interfaces::SimpleNetwork::Handler2<bisection_test,&bisection_test::send_handler>(this));
 
 
     self_link = configureSelfLink("complete_link", "2GHz",
-                                  new Event::Handler<bisection_test>(this,&bisection_test::handle_complete));
+                                  new Event::Handler2<bisection_test,&bisection_test::handle_complete>(this));
 
     registerAsPrimaryComponent();
     primaryComponentDoNotEndSim();
@@ -113,7 +113,7 @@ void bisection_test::setup()
     // std::cout << link_bw.toStringBestSI() << std::endl;
 
     link_bw *= (UnitAlgebra("1b") *= packet_size);
-    TimeConverter* tc = getTimeConverter(link_bw);
+    TimeConverter tc = getTimeConverter(link_bw);
     // std::cout << link_bw.toStringBestSI() << std::endl;
     self_link->setDefaultTimeBase(tc);
     // std::cout << tc->getFactor() << std::endl;

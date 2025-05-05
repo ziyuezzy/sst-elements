@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -127,12 +127,12 @@ TrafficGen::TrafficGen(ComponentId_t cid, Params& params) :
 
     registerAsPrimaryComponent();
     primaryComponentDoNotEndSim();
-    clock_functor = new Clock::Handler<TrafficGen>(this,&TrafficGen::clock_handler);
+    clock_functor = new Clock::Handler2<TrafficGen,&TrafficGen::clock_handler>(this);
     clock_tc = registerClock( params.find<std::string>("message_rate", "1GHz"), clock_functor, false);
 
     // Register a receive handler which will simply strip the events as they arrive
-    link_control->setNotifyOnReceive(new SST::Interfaces::SimpleNetwork::Handler<TrafficGen>(this,&TrafficGen::handle_receives));
-    send_notify_functor = new SST::Interfaces::SimpleNetwork::Handler<TrafficGen>(this,&TrafficGen::send_notify);
+    link_control->setNotifyOnReceive(new SST::Interfaces::SimpleNetwork::Handler2<TrafficGen,&TrafficGen::handle_receives>(this));
+    send_notify_functor = new SST::Interfaces::SimpleNetwork::Handler2<TrafficGen,&TrafficGen::send_notify>(this);
 }
 
 

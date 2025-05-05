@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -25,8 +25,8 @@ namespace Hg {
 extern template class  HgBase<SST::Component>;
 extern template class  HgBase<SST::SubComponent>;
 
-AppLauncher::AppLauncher(OperatingSystem* os) :
-  os_(os)
+AppLauncher::AppLauncher(OperatingSystem* os, unsigned int npernode) :
+  os_(os), npernode_(npernode)
 {
 }
 
@@ -34,74 +34,24 @@ void
 AppLauncher::incomingRequest(AppLaunchRequest* req)
 {
   Params app_params = req->params();
-  SoftwareId sid(req->aid(), os_->addr()-1);
+
+  if (local_offset.find(req->aid()) == local_offset.end() ) {
+    local_offset[req->aid()] = 0;
+  }
+  unsigned int taskid = os_->addr() * npernode_ + local_offset[req->aid()];
+  SoftwareId sid(req->aid(), taskid);
+  ++local_offset[req->aid()];
 
   std::string app_name;
   if (app_params.count("label")) {
       app_name = app_params.find<std::string>("label","");
   }
   else app_name = app_params.find<std::string>("name","");
-  //std::cerr << "launching app_name " << app_name << std::endl;
   std::string exe = app_params.find<std::string>("exe","");
-  //std::cerr << "launching exe " << exe << std::endl;
-
   App::dlopenCheck(req->aid(), app_params);
-  //app_params.print_all_params(std::cerr);
   App* theapp = create<App>("hg", app_name, app_params, sid, os_);
-  //theapp->setUniqueName(lreq->uniqueName());
-  //int intranode_rank = num_apps_launched_[lreq->aid()]++;
-  //int core_affinity = lreq->coreAffinity(intranode_rank);
-  //if (core_affinity != Thread::no_core_affinity){
-  //    theapp->setAffinity(core_affinity);
-  //  }
-
   os_->startApp(theapp, "my unique name");
 }
 
-//void
-//AppLauncher::start()
-//{
-//  Service::start();
-//  if (!os_) {
-//    spkt_throw_printf(sprockit::ValueError,
-//                     "AppLauncher::start: OS hasn't been registered yet");
-//  }
-//}
-
-//hw::NetworkMessage*
-//LaunchRequest::cloneInjectionAck() const
-//{
-//  spkt_abort_printf("launch event should never be cloned for injection");
-//  return nullptr;
-//}
-
-//int
-//StartAppRequest::coreAffinity(int  /*intranode_rank*/) const
-//{
-//  return Thread::no_core_affinity;
-//}
-
-//void
-//StartAppRequest::serialize_order(serializer &ser)
-//{
-//  LaunchRequest::serialize_order(ser);
-//  ser & unique_name_;
-//  ser & app_params_;
-//  mapping_ = TaskMapping::serialize_order(aid(), ser);
-//}
-
-//std::string
-//StartAppRequest::toString() const
-//{
-//  return sprockit::sprintf("start_app_event: app=%d task=%d node=%d", aid(), tid(), toaddr());
-//}
-
-//std::string
-//JobStopRequest::toString() const
-//{
-//  return sprockit::sprintf("job_stop_event: app=%d task=%d node=%d", aid(), tid(), fromaddr());
-//}
-
-
-}
-}
+} // end namespace Hg
+} // end namespace SST

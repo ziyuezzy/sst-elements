@@ -1,5 +1,5 @@
 /**
-Copyright 2009-2024 National Technology and Engineering Solutions of Sandia,
+Copyright 2009-2025 National Technology and Engineering Solutions of Sandia,
 LLC (NTESS).  Under the terms of Contract DE-NA-0003525, the U.S. Government
 retains certain rights in this software.
 
@@ -8,7 +8,7 @@ by National Technology and Engineering Solutions of Sandia, LLC., a wholly
 owned subsidiary of Honeywell International, Inc., for the U.S. Department of
 Energy's National Nuclear Security Administration under contract DE-NA0003525.
 
-Copyright (c) 2009-2024, NTESS
+Copyright (c) 2009-2025, NTESS
 
 All rights reserved.
 
@@ -62,7 +62,7 @@ namespace SST::Iris::sumi {
 static SimTransport* current_transport()
 {
   Thread* t = Thread::current();
-  return t->getApi<SimTransport>("sumi");
+  return t->getLibrary<SimTransport>("sumi");
 }
 
 static CollectiveEngine* current_engine()
@@ -176,28 +176,6 @@ Message* comm_poll()
 double wall_time()
 {
   return OperatingSystem::currentOs()->now().sec();
-}
-
-void sleepUntil(double sec)
-{
-  Thread* thr = Thread::current();
-  App* my_app = thr->parentApp();
-  double time = sec - my_app->now().sec();
-  my_app->sleep(TimeDelta(time));
-}
-
-void sleep(double sec)
-{
-  Thread* thr = Thread::current();
-  App* my_app = thr->parentApp();
-  my_app->sleep(TimeDelta(sec));
-}
-
-void compute(double sec)
-{
-  Thread* thr = Thread::current();
-  App* my_app = thr->parentApp();
-  my_app->compute(TimeDelta(sec));
 }
 
 }

@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -144,15 +144,13 @@ void c_Transaction::print(SST::Output *x_output, const std::string x_prefix, Sim
 
 void c_Transaction::serialize_order(SST::Core::Serialization::serializer &ser)
 {
-  ser & m_seqNum;
-  ser & m_txnMnemonic;
-  ser & m_addr;
-  //ser & m_txnToString;
+  SST_SER(m_seqNum);
+  SST_SER(m_txnMnemonic);
+  SST_SER(m_addr);
 
-  ser & m_isResponseReady;
-  ser & m_numWaitingCommands;
-  ser & m_dataWidth;
-  ser & m_processed;
-    ser & m_hasHashedAddr;
-
+  SST_SER(m_isResponseReady);
+  SST_SER(m_numWaitingCommands);
+  SST_SER(m_dataWidth);
+  SST_SER(m_processed);
+  SST_SER(m_hasHashedAddr);
 }

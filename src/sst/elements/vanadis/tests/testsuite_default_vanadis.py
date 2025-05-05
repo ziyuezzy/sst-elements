@@ -91,6 +91,21 @@ def build_vanadis_test_matrix():
             testlist.append(["basic_vanadis.py", location, test,arch, 1,32, "32thread", 300])
             testlist.append(["basic_vanadis.py", location, test,arch, 4,8, "4core-8thread", 300])
 
+    location="small/rocc"
+    tests = ['basic-rocc']
+    arch_list = ["riscv64"]
+    for test in tests:
+        for arch in arch_list:
+            testlist.append(["rocc_vanadis.py", location, test,arch, 1,1, "2rocc", 300])
+
+    location="small/multicore"
+    tests = ["openmp"]
+    arch_list = ["riscv64"]
+    for test in tests:
+        for arch in arch_list:
+            testlist.append(["basic_vanadis.py", location, test,arch, 3,1, "3core", 300])
+
+
     # Process each line and crack up into an index, hash, options and sdl file
     for testnum, test_info in enumerate(testlist):
         # Make testnum start at 1
@@ -144,6 +159,9 @@ class testcase_vanadis(SSTTestCase):
 
         if MakeTests:
             self.makeTest( testname, isa, elftestdir, elffile )
+        # Only run the first 15 tests if we are not in a Nightly test
+        if not testing_check_is_nightly() and testnum > 15:
+            self.skipTest("Complete vanadis_short_tests only runs on Nightly builds.")
         log_debug("Running Vanadis test #{0} ({1}): elffile={4} in dir {3}, isa {5}; using sdl={2}".format(testnum, testname, sdlfile, elftestdir, elffile, isa, timeout_sec))
         self.vanadis_test_template(testnum, testname, sdlfile, elftestdir, elffile, isa, numCores, numHwThreads, goldfiledir, timeout_sec )
 

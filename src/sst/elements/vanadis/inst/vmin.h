@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -57,9 +57,9 @@ public:
             phys_int_regs_in[0], phys_int_regs_in[1]);
     }
 
-    void instOp(VanadisRegisterFile* regFile, 
-        uint16_t phys_int_regs_out_0, uint16_t phys_int_regs_in_0, 
-        uint16_t phys_int_regs_in_1)
+    void instOp(VanadisRegisterFile* regFile,
+        uint16_t phys_int_regs_out_0, uint16_t phys_int_regs_in_0,
+        uint16_t phys_int_regs_in_1) override
     {
         const gpr_format src_1 = regFile->getIntReg<gpr_format>(phys_int_regs_in_0);
 	    const gpr_format src_2 = regFile->getIntReg<gpr_format>(phys_int_regs_in_1);

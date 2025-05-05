@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -13,17 +13,6 @@
 // information, see the LICENSE file in the top level directory of the
 // distribution.
 
-/**
- * @file dmaEngine.cc
- * @author Weili An (an107@purdue.edu)
- * @brief A DMA engine component to copy data from SST memspace to
- *        simulator memspace and vice versa
- * @version 0.1
- * @date 2022-10-18
- * 
- * 
- */
-
 #ifndef BALAR_DMA_ENGINE_H
 #define BALAR_DMA_ENGINE_H
 
@@ -33,7 +22,6 @@
 #include <sst/core/interfaces/stdMem.h>
 
 #include "sst/elements/memHierarchy/util.h"
-#include "sst/elements/memHierarchy/memTypes.h"
 
 using namespace std;
 using namespace SST;
@@ -57,7 +45,8 @@ public:
         {"mmio_size",               "(uint) Size of the MMIO memory range (Bytes)", "512"},
     )
     SST_ELI_DOCUMENT_SUBCOMPONENT_SLOTS( 
-        {"iface", "Interface into interconnect", "SST::Interfaces::StandardMem"},
+        {"mmio_iface", "Command packet MMIO interface", "SST::Interfaces::StandardMem"},
+        {"mem_iface", "Memory data packet interface", "SST::Interfaces::StandardMem"},
     )
 
     DMAEngine(ComponentId_t id, Params &params);
@@ -105,12 +94,18 @@ public:
         // each time we perform a copy in DMA
         // Once the data_size is zero, we are done
         uint32_t transfer_size;
+        // Use to track how many DMA requests are still waiting for mem response
+        size_t ongoing_count;
+        // Offset for sending the request to memory
+        size_t offset;
         enum DMA_DIR dir;
 
         // Rest are status regs
         enum DMA_Status status;
         enum DMA_ERR errflag;
     };
+
+    typedef struct DMAEngineControlRegisters DMAEngineRequest_t;
 
 protected:
     /* Handle DMA requests from Host and responses from mem system */
@@ -121,7 +116,6 @@ protected:
         friend class DMAEngine;
         DMAHandlers(DMAEngine* dma, SST::Output* out) : StandardMem::RequestHandler(out), dma(dma) {}
         virtual ~DMAHandlers() {}
-        virtual void handle(StandardMem::Read* read) override;
 
         /**
          * @brief Pass in the simulator buffer address and size
@@ -140,7 +134,11 @@ protected:
         DMAEngine* dma;
     };
 
-    struct DMAEngineControlRegisters dma_ctrl_regs;
+    /* Received ongoing DMA request queue */
+    std::vector<std::pair<DMAEngineRequest_t *, StandardMem::Write*>> dma_requests;
+
+    /* Memory requests associating with an active DMA request */
+    std::map<StandardMem::Request::id_t, DMAEngineRequest_t *> memory_requests;
 
 private:
     /* Output */
@@ -150,8 +148,10 @@ private:
     Addr mmio_addr;
     uint32_t mmio_size;
 
-    /* Interconnect interfaces */
-    StandardMem* iface;
+    /* Command MMIO interface */
+    StandardMem* mmio_iface;
+    /* Memory access interface */
+    StandardMem* mem_iface;
 
     /* Handlers */
     DMAHandlers* handlers;
@@ -159,6 +159,8 @@ private:
     /* Save pending transfer and notify host once finishes */
     StandardMem::Write* pending_transfer;
 
+    /* Convert DMA reg to string */
+    std::string dmaRegToString(DMAEngineControlRegisters* reg_ptr);
 
     /* Debug -triggered by output.fatal() and/or SIGUSR2 */
     virtual void emergencyShutdown() {};

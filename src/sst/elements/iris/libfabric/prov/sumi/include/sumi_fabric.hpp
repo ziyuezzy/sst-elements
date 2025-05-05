@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -105,18 +105,17 @@ class FabricTransport : public SST::Iris::sumi::SimTransport {
 
  public:
   SST_ELI_REGISTER_DERIVED(
-    API,
+    Library,
     FabricTransport,
     "macro",
     "libfabric",
     SST_ELI_ELEMENT_VERSION(1,0,0),
-    "provides the libfabric transport API")
+    "implements the libfabric transport API")
 
   public:
     FabricTransport(SST::Params& params,
-                    SST::Hg::App* parent,
-                    SST::Component* comp) :
-      SST::Iris::sumi::SimTransport(params, parent, comp),
+                    SST::Hg::App* parent) :
+      SST::Iris::sumi::SimTransport(params, parent),
       inited_(false)
   {
   }

@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -25,15 +25,13 @@
 namespace SST {
 namespace Hg {
 
-static int app_rank_;
-
 /**
  * A launcher that can be cooperatively scheduled by a very naive scheduler.
  */
 class AppLauncher
 {
  public:
-  AppLauncher(OperatingSystem* os);
+  AppLauncher(OperatingSystem* os, unsigned int npernode);
 
   ~AppLauncher() {}
 
@@ -44,7 +42,8 @@ class AppLauncher
  protected:
   bool is_completed_;
 
-  std::unordered_map<AppId, int> num_apps_launched_;
+  unsigned int npernode_;
+  std::unordered_map<AppId, unsigned int> local_offset;
   OperatingSystem* os_;
 };
 

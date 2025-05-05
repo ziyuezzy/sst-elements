@@ -1,5 +1,5 @@
 /**
-Copyright 2009-2024 National Technology and Engineering Solutions of Sandia,
+Copyright 2009-2025 National Technology and Engineering Solutions of Sandia,
 LLC (NTESS).  Under the terms of Contract DE-NA-0003525, the U.S. Government
 retains certain rights in this software.
 
@@ -8,7 +8,7 @@ by National Technology and Engineering Solutions of Sandia, LLC., a wholly
 owned subsidiary of Honeywell International, Inc., for the U.S. Department of
 Energy's National Nuclear Security Administration under contract DE-NA0003525.
 
-Copyright (c) 2009-2024, NTESS
+Copyright (c) 2009-2025, NTESS
 
 All rights reserved.
 
@@ -75,13 +75,15 @@ namespace SST::MASKMPI {
 //
 // Build comm_world using information retrieved from the environment.
 //
-MpiCommFactory::MpiCommFactory(SoftwareId sid, MpiApi* parent) :
+MpiCommFactory::MpiCommFactory(SoftwareId sid, MpiApi* parent, unsigned int verbose) :
   parent_(parent),
   aid_(sid.app_),
   next_id_(1),
   worldcomm_(nullptr),
   selfcomm_(nullptr)
 {
+  out_ = std::unique_ptr<SST::Output>(
+    new SST::Output("MpiCommFactory:", verbose, 0, Output::STDOUT));
 }
 
 MpiCommFactory::~MpiCommFactory()
@@ -95,6 +97,9 @@ MpiCommFactory::~MpiCommFactory()
 void
 MpiCommFactory::init(int rank, int nproc)
 {
+  out_->debug(CALL_INFO, 1, 0,
+    "rank %d MpiCommFactory::init with nproc %d\n", rank, nproc);
+
   next_id_ = 2;
 
   MpiGroup* g = new MpiGroup(nproc);

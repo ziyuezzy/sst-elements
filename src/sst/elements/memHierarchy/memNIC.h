@@ -1,8 +1,8 @@
-// Copyright 2013-2024 NTESS. Under the terms
+// Copyright 2013-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2013-2024, NTESS
+// Copyright (c) 2013-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -90,8 +90,10 @@ public:
 
     /* Initialization and finish */
     void init(unsigned int phase) override;
-    void finish() override { link_control->finish(); }
     void setup() override { link_control->setup(); MemNICBase::setup(); }
+    void complete(unsigned int phase) override;
+    void finish() override { link_control->finish(); }
+    void sendUntimedData(MemEventInit* ev, bool broadcast, bool lookup_dst) override;
 
     /* Debug */
     void printStatus(Output &out) override;
@@ -109,8 +111,8 @@ private:
     std::queue<SST::Interfaces::SimpleNetwork::Request*> sendQueue; // Queue of events waiting to be sent (sent on clock)
 
     // Clocks
-    Clock::Handler<MemNIC>* clockHandler;
-    TimeConverter* clockTC;
+    Clock::HandlerBase* clockHandler;
+    TimeConverter clockTC;
 };
 
 } //namespace memHierarchy

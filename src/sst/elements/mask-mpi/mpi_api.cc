@@ -1,5 +1,5 @@
 /**
-Copyright 2009-2024 National Technology and Engineering Solutions of Sandia,
+Copyright 2009-2025 National Technology and Engineering Solutions of Sandia,
 LLC (NTESS).  Under the terms of Contract DE-NA-0003525, the U.S. Government
 retains certain rights in this software.
 
@@ -8,7 +8,7 @@ by National Technology and Engineering Solutions of Sandia, LLC., a wholly
 owned subsidiary of Honeywell International, Inc., for the U.S. Department of
 Energy's National Nuclear Security Administration under contract DE-NA0003525.
 
-Copyright (c) 2009-2024, NTESS
+Copyright (c) 2009-2025, NTESS
 
 All rights reserved.
 
@@ -110,19 +110,17 @@ namespace SST::MASKMPI {
 MpiApi* mask_mpi()
 {
   SST::Hg::Thread* t = SST::Hg::OperatingSystem::currentThread();
-  return t->getApi<MpiApi>("MpiApi");
+  return t->getLibrary<MpiApi>("MpiApi");
 }
 
 //
 // Build a new mpiapi.
 //
-MpiApi::MpiApi(SST::Params& params, SST::Hg::App* app,
-               SST::Component* comp) :
-  SST::Iris::sumi::SimTransport(params, app, comp),
+MpiApi::MpiApi(SST::Params& params, SST::Hg::App* app) :
+  SST::Iris::sumi::SimTransport(params, app),
   queue_(nullptr),
   next_type_id_(0),
   next_op_id_(first_custom_op_id),
-  comm_factory_(app->sid(), this),
   status_(is_fresh),
   crossed_comm_world_barrier_(false),
   worldcomm_(nullptr),
@@ -134,6 +132,12 @@ MpiApi::MpiApi(SST::Params& params, SST::Hg::App* app,
   req_counter_(0),
   generate_ids_(true)
 {
+  verbose_ = params.find<unsigned int>("verbose", 0);
+  out_ = std::unique_ptr<SST::Output>(
+    new SST::Output("MpiApi:", verbose_, 0, Output::STDOUT));
+
+  comm_factory_ = new MpiCommFactory(app->sid(), this, verbose_);
+
   if (!engine_) engine_ = new Iris::sumi::CollectiveEngine(params, this);
 
   queue_ = new MpiQueue(params, app->sid().task_, this, engine_);
@@ -189,12 +193,13 @@ MpiApi::~MpiApi()
     delete comm;
   }
 
-  //people can be sloppy cleaning up requests
-  //clean up for them
-  for (auto& pair : req_map_){
-    MpiRequest* req = pair.second;
-    delete req;
-  }
+  // This causes a "pointer being freed was not allocated" error
+  // //people can be sloppy cleaning up requests
+  // //clean up for them
+  // for (auto& pair : req_map_){
+  //   MpiRequest* req = pair.second;
+  //   delete req;
+  // }
 
   if (qos_analysis_) delete qos_analysis_;
 }
@@ -222,6 +227,9 @@ MpiApi::init(int*  /*argc*/, char***  /*argv*/)
   auto start_clock = traceClock();
 #endif
 
+out_->debug(CALL_INFO, 1, 0,
+  "rank %d init\n", rank_);
+
   if (status_ == is_initialized){
     SST::Hg::abort("MPI_Init cannot be called twice");
   }
@@ -230,14 +238,16 @@ MpiApi::init(int*  /*argc*/, char***  /*argv*/)
 
   Iris::sumi::SimTransport::init();
 
-  comm_factory_.init(rank_, nproc_);
+  comm_factory_->init(rank_, nproc_);
 
-  worldcomm_ = comm_factory_.world();
+  worldcomm_ = comm_factory_->world();
   if (smp_optimize_){
+    out_->debug(CALL_INFO, 1, 0,
+      "rank %d creating smp communicator\n", rank_);
     worldcomm_->createSmpCommunicator(smp_neighbors_, engine(), Iris::sumi::Message::default_cq);
   }
 
-  selfcomm_ = comm_factory_.self();
+  selfcomm_ = comm_factory_->self();
   comm_map_[MPI_COMM_WORLD] = worldcomm_;
   comm_map_[MPI_COMM_SELF] = selfcomm_;
   grp_map_[MPI_GROUP_WORLD] = worldcomm_->group();

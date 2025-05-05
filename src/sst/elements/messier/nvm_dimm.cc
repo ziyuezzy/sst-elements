@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // This file is part of the SST software package. For license
@@ -219,9 +219,8 @@ bool NVM_DIMM::tick()
 void NVM_DIMM::schedule_delivery()
 {
 
-    std::map<NVM_Request *, long long int>::iterator st_1, en_1;
-    st_1 = ready_at_NVM.begin();
-    en_1 = ready_at_NVM.end();
+    auto st_1 = ready_at_NVM.begin();
+    auto en_1 = ready_at_NVM.end();
 
     while (st_1 != en_1)
     {

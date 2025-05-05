@@ -1,8 +1,8 @@
-// Copyright 2013-2024 NTESS. Under the terms
+// Copyright 2013-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2013-2024, NTESS
+// Copyright (c) 2013-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -78,13 +78,13 @@ ReorderLinkControl::setup()
     //     delete init_events.front();
     //     init_events.pop_front();
     // }
-    link_control->setNotifyOnReceive(new SimpleNetwork::Handler<ReorderLinkControl>(this,&ReorderLinkControl::handle_event));
+    link_control->setNotifyOnReceive(new SimpleNetwork::Handler2<ReorderLinkControl,&ReorderLinkControl::handle_event>(this));
 }
 
 void ReorderLinkControl::init(unsigned int phase)
 {
     if ( phase == 0 ) {
-        link_control->setNotifyOnReceive(new SimpleNetwork::Handler<ReorderLinkControl>(this,&ReorderLinkControl::handle_event));
+        link_control->setNotifyOnReceive(new SimpleNetwork::Handler2<ReorderLinkControl,&ReorderLinkControl::handle_event>(this));
     }
     link_control->init(phase);
     if (link_control->isNetworkInitialized()) {

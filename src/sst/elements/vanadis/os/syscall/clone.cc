@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -89,8 +89,8 @@ VanadisCloneSyscall::VanadisCloneSyscall( VanadisNodeOSComponent* os, SST::Link*
     } else {
         // DETACHED is deprecated
         if ( ( event->getFlags() & ~RISVC_CLONE_DETACHED ) != CLONE_FLAGS ) {
-            m_output->fatal(CALL_INFO, -1, "Error: clone, flags not supported %#llx\n",event->getFlags());
-        }    
+            m_output->fatal(CALL_INFO, -1, "Error: clone, flags not supported %#" PRIx64 "\n",event->getFlags());
+        }
         m_newThread = new OS::ProcessInfo;
 
         // this make an exact copy of the process which implies pointers to classes are the same for both processes

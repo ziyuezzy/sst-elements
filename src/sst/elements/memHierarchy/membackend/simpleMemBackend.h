@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -33,11 +33,20 @@ public:
             {"access_time", "(string) Constant latency of memory operations. With units (SI ok).", "100ns"} )
 
 /* Begin class definition */
-    SimpleMemory();
     SimpleMemory(ComponentId_t id, Params &params);
-    bool issueRequest(ReqId, Addr, bool, unsigned );
-    virtual bool isClocked() { return false; }
+    bool issueRequest(ReqId, Addr, bool, unsigned ) override;
+    virtual bool isClocked() override { return false; }
 
+    // Serialization
+    SimpleMemory() {}
+    void serialize_order(SST::Core::Serialization::serializer& ser) override {
+        SimpleMemBackend::serialize_order(ser);
+        SST_SER(self_link);
+    }
+    ImplementSerializable(SST::MemHierarchy::SimpleMemory)
+
+public:
+    // Custom Event
     class MemCtrlEvent : public SST::Event {
     public:
         MemCtrlEvent( ReqId id_) : SST::Event(), reqId(id_)
@@ -51,7 +60,7 @@ public:
     public:
         void serialize_order(SST::Core::Serialization::serializer &ser)  override {
             Event::serialize_order(ser);
-            ser & reqId;  // Cannot serialize pointers unless they are a serializable object
+            SST_SER(reqId);  // Cannot serialize pointers unless they are a serializable object
        }
 
         ImplementSerializable(SST::MemHierarchy::SimpleMemory::MemCtrlEvent);

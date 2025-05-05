@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -27,12 +27,15 @@
     NAME(SYSCALL_OP_ACCESS)\
     NAME(SYSCALL_OP_CHECKPOINT)\
     NAME(SYSCALL_OP_BRK)\
+    NAME(SYSCALL_OP_SCHED_SETAFFINITY)\
     NAME(SYSCALL_OP_SCHED_GETAFFINITY)\
+    NAME(SYSCALL_OP_SCHED_YIELD)\
     NAME(SYSCALL_OP_SET_THREAD_AREA)\
     NAME(SYSCALL_OP_FORK)\
     NAME(SYSCALL_OP_CLONE)\
     NAME(SYSCALL_OP_KILL)\
     NAME(SYSCALL_OP_FUTEX)\
+    NAME(SYSCALL_OP_GETCPU)\
     NAME(SYSCALL_OP_GETPID)\
     NAME(SYSCALL_OP_GETTID)\
     NAME(SYSCALL_OP_GETPPID)\
@@ -65,6 +68,7 @@
     NAME(SYSCALL_OP_SET_TID_ADDRESS)\
     NAME(SYSCALL_OP_SET_ROBUST_LIST)\
     NAME(SYSCALL_OP_PRLIMIT)\
+    NAME(SYSCALL_OP_HWPROBE)\
     NAME(NUM_SYSCALLS)\
 
 namespace SST {

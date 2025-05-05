@@ -1,8 +1,8 @@
-// Copyright 2013-2024 NTESS. Under the terms
+// Copyright 2013-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2013-2024, NTESS
+// Copyright (c) 2013-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -13,7 +13,7 @@
 // information, see the LICENSE file in the top level directory of the
 // distribution.
 
-#include <sst_config.h>
+#include <sst/core/sst_config.h>
 #include "directoryController.h"
 
 
@@ -21,14 +21,7 @@
 
 #include "memNIC.h"
 
-/* Debug macros */
-#ifdef __SST_DEBUG_OUTPUT__ /* From sst-core, enable with --enable-debug */
-#define is_debug_addr(addr) (DEBUG_ADDR.empty() || DEBUG_ADDR.find(addr) != DEBUG_ADDR.end())
-#define is_debug_event(ev) (DEBUG_ADDR.empty() || ev->doDebug(DEBUG_ADDR))
-#else
-#define is_debug_addr(addr) false
-#define is_debug_event(ev) false
-#endif
+/* Debug macros included from util.h */
 
 using namespace SST;
 using namespace SST::MemHierarchy;
@@ -45,13 +38,8 @@ DirectoryController::DirectoryController(ComponentId_t id, Params &params) :
     dbg.init("", debugLevel, 0, (Output::output_location_t)params.find<int>("debug", 0));
 
     // Detect deprecated parameters and warn/fatal
-    // Currently deprecated - network_num_vc
     bool found;
     out.init("", params.find<int>("verbose", 1), 0, Output::STDOUT);
-    params.find<int>("network_num_vc", 0, found);
-    if (found) {
-        out.output("%s, ** Found deprecated parameter: network_num_vc ** MemHierarchy does not use multiple virtual channels. Remove this parameter from your input deck to eliminate this message.\n", getName().c_str());
-    }
 
     // Debug address
     std::vector<Addr> addrArr;
@@ -109,7 +97,7 @@ DirectoryController::DirectoryController(ComponentId_t id, Params &params) :
                 getName().c_str(), ilStep.c_str());
     }
 
-    clockHandler = new Clock::Handler<DirectoryController>(this, &DirectoryController::clock);
+    clockHandler = new Clock::Handler2<DirectoryController, &DirectoryController::clock>(this);
     defaultTimeBase = registerClock(params.find<std::string>("clock", "1GHz"), clockHandler);
     clockOn = true;
 
@@ -129,32 +117,58 @@ DirectoryController::DirectoryController(ComponentId_t id, Params &params) :
      *  the MCs their own region. We cannot error check from the parameters...
      */
 
-    cpuLink = loadUserSubComponent<MemLinkBase>("cpulink", ComponentInfo::SHARE_NONE, defaultTimeBase);
-    memLink = loadUserSubComponent<MemLinkBase>("memlink", ComponentInfo::SHARE_NONE, defaultTimeBase);
-    if (cpuLink || memLink) {
-        if (!cpuLink) {
-            cpuLink = memLink;
-            memLink = nullptr;
+    linkUp_ = loadUserSubComponent<MemLinkBase>("highlink", ComponentInfo::SHARE_NONE, &defaultTimeBase);
+    if (!linkUp_) {
+        linkUp_ = loadUserSubComponent<MemLinkBase>("cpulink", ComponentInfo::SHARE_NONE, &defaultTimeBase);
+        if (linkUp_) {
+            out.output("%s, DEPRECATION WARNING: The 'cpulink' subcomponent slot has been renamed to 'highlink' to improve name standardization. Please change this in your input file.\n", getName().c_str());
+        }
+
+        if (!linkUp_ && isPortConnected("highlink")) {
+            Params p;
+            p.insert("port", "highlink");
+            linkUp_ = loadAnonymousSubComponent<MemLinkBase>("memHierarchy.MemLink", "highlink", 0, ComponentInfo::SHARE_PORTS | ComponentInfo::INSERT_STATS, p, &defaultTimeBase);
+        }
+    }
+
+    linkDown_ = loadUserSubComponent<MemLinkBase>("lowlink", ComponentInfo::SHARE_NONE, &defaultTimeBase);
+    if (!linkDown_) {
+        linkDown_ = loadUserSubComponent<MemLinkBase>("memlink", ComponentInfo::SHARE_NONE, &defaultTimeBase);
+        if (linkDown_) {
+            out.output("%s, DEPRECATION WARNING: The 'memlink' subcomponent slot has been renamed to 'lowlink' to improve name standardization. Please change this in your input file.\n", getName().c_str());
+        }
+        
+        if (!linkDown_ && isPortConnected("lowlink")) {
+            Params p;
+            p.insert("port", "lowlink");
+            linkDown_ = loadAnonymousSubComponent<MemLinkBase>("memHierarchy.MemLink", "lowlink", 0, ComponentInfo::SHARE_PORTS | ComponentInfo::INSERT_STATS, p, &defaultTimeBase);
+        }
+    }
+
+    if (linkUp_ || linkDown_) {
+        if (!linkUp_) {
+            linkUp_ = linkDown_;
+            linkDown_ = nullptr;
         }
         if (gotRegion) {
-            cpuLink->setRegion(region);
+            linkUp_->setRegion(region);
         } else {
-            if (cpuLink->getRegion() != region) {
-                out.output(CALL_INFO, "%s, Warning: getting region parameters (addr_range_start/end, interleave_step/size) from link subcomponent."
-                        " In the future this will not be supported and region parameters should be declared in the directory's parameters instead.\n", getName().c_str());
+            if (linkUp_->getRegion() != region) {
+                out.output(CALL_INFO, "%s, DEPRECATION WARNING: getting region parameters (addr_range_start/end, interleave_step/size) from link subcomponent."
+                        " In SST 16 this will not be supported and region parameters should be declared in the directory's parameters instead.\n", getName().c_str());
             }
-            region = cpuLink->getRegion();
+            region = linkUp_->getRegion();
         }
 
-        if (memLink)
-            memLink->setRegion(region);
+        if (linkDown_)
+            linkDown_->setRegion(region);
 
-        cpuLink->setRecvHandler(new Event::Handler<DirectoryController>(this, &DirectoryController::handlePacket));
-        if (!memLink) {
+        linkUp_->setRecvHandler(new Event::Handler2<DirectoryController, &DirectoryController::handlePacket>(this));
+        if (!linkDown_) {
             if (params.find<std::string>("net_memory_name", "") != "")
                 dbg.fatal(CALL_INFO, -1, "%s, Error: parameter 'net_memory_name' is no longer supported. Memory and directory components should specify their own address regions (address_range_start/end, interleave_step/size) and mapping will be inferred from that. Remove this parameter from your input deck to eliminate this error.\n", getName().c_str());
         } else {
-            memLink->setRecvHandler(new Event::Handler<DirectoryController>(this, &DirectoryController::handlePacket));
+            linkDown_->setRecvHandler(new Event::Handler2<DirectoryController, &DirectoryController::handlePacket>(this));
         }
     } else {
         /* Set up links/network to cache & memory the old way -> and fixup params accordingly */
@@ -175,6 +189,10 @@ DirectoryController::DirectoryController(ComponentId_t id, Params &params) :
         nicParams.insert("destinations", std::to_string(cl + 1), false);
 
         // Determine which ports are connected
+        // Acceptable port configurations are
+        // 1. network (memory optional)
+        // 2. network, network_ack, network_fwd, network_data (memory optional)
+        // 3. cpulink + memlink
         unsigned int portCount = 1;
         if (isPortConnected("network_ack")) portCount++;
         if (isPortConnected("network_fwd")) portCount++;
@@ -184,40 +202,60 @@ DirectoryController::DirectoryController(ComponentId_t id, Params &params) :
             nicParams.insert("ack.port", "network_ack");
             nicParams.insert("fwd.port", "network_fwd");
             nicParams.insert("data.port", "network_data");
-            cpuLink = loadAnonymousSubComponent<MemLinkBase>("memHierarchy.MemNICFour", "cpulink", 0, ComponentInfo::SHARE_PORTS | ComponentInfo::INSERT_STATS, nicParams, defaultTimeBase);
-        } else {
+            linkUp_ = loadAnonymousSubComponent<MemLinkBase>("memHierarchy.MemNICFour", "highlink", 0, ComponentInfo::SHARE_PORTS | ComponentInfo::INSERT_STATS, nicParams, &defaultTimeBase);
+            out.output("%s, DEPRECATION WARNING: The 'network', 'network_ack', 'network_fwd', and 'network_data' ports are deprecated. Instead, in your input file, fill the directory's 'highlink' subcomponent slot with 'memHierarchy.MemNICFour'.\n", getName().c_str());
+
+        } else if (isPortConnected("network")) {
             nicParams.insert("port", "network");
-            cpuLink = loadAnonymousSubComponent<MemLinkBase>("memHierarchy.MemNIC", "cpulink", 0, ComponentInfo::SHARE_PORTS | ComponentInfo::INSERT_STATS, nicParams, defaultTimeBase);
+            linkUp_ = loadAnonymousSubComponent<MemLinkBase>("memHierarchy.MemNIC", "highlink", 0, ComponentInfo::SHARE_PORTS | ComponentInfo::INSERT_STATS, nicParams, &defaultTimeBase);
+            out.output("%s, DEPRECATION WARNING: The 'network' port is deprecated. Instead, in your input file, fill the directory's 'highlink' subcomponent slot with 'memHierarchy.MemNIC'.\n", getName().c_str());
+        } else if (isPortConnected("highlink")) {
+            Params linkParams;
+            linkParams.insert("port", "highlink");
+            linkUp_ = loadAnonymousSubComponent<MemLinkBase>("memHierarchy.MemLink", "highlink", 0, ComponentInfo::SHARE_PORTS | ComponentInfo::INSERT_STATS, linkParams, &defaultTimeBase);
+        } else {
+            dbg.fatal(CALL_INFO, -1, "%s, Error: Either this component's 'highlink' port must be connected OR the 'highlink' subcomponent slot must be filled\n", getName().c_str());
         }
 
-        cpuLink->setRecvHandler(new Event::Handler<DirectoryController>(this, &DirectoryController::handlePacket));
+        linkUp_->setRecvHandler(new Event::Handler2<DirectoryController, &DirectoryController::handlePacket>(this));
 
         if (isPortConnected("memory")) {
             Params memParams = params.get_scoped_params("memlink");
             memParams.insert("port", "memory");
-            memParams.insert("latency", "1ns");
+            memParams.insert("latency", "1ns"); // Leaving this here since this port is deprecated but it should not be here. Instead use the link latency.
             memParams.insert("addr_range_start", std::to_string(region.start), false);
             memParams.insert("addr_range_end", std::to_string(region.end), false);
             memParams.insert("interleave_size", ilSize, false);
             memParams.insert("interleave_step", ilStep, false);
-            memLink = loadAnonymousSubComponent<MemLinkBase>("memHierarchy.MemLink", "memlink", 0, ComponentInfo::SHARE_PORTS | ComponentInfo::INSERT_STATS, memParams, defaultTimeBase);
-            memLink->setRecvHandler(new Event::Handler<DirectoryController>(this, &DirectoryController::handlePacket));
-            if (!memLink) {
+            linkDown_ = loadAnonymousSubComponent<MemLinkBase>("memHierarchy.MemLink", "lowlink", 0, ComponentInfo::SHARE_PORTS | ComponentInfo::INSERT_STATS, memParams, &defaultTimeBase);
+            if (!linkDown_) {
                 dbg.fatal(CALL_INFO, -1, "%s, Error creating link to memory from directory controller\n", getName().c_str());
             }
+            linkDown_->setRecvHandler(new Event::Handler2<DirectoryController, &DirectoryController::handlePacket>(this));
+            out.output("%s, DEPRECATION WARNING: The 'memory' port is deprecated. Use the 'lowlink' port instead.\n", getName().c_str());
+        } else if (isPortConnected("lowlink")) {
+            Params memParams;
+            memParams.insert("port", "lowlink");
+            memParams.insert("addr_range_start", std::to_string(region.start), false);
+            memParams.insert("addr_range_end", std::to_string(region.end), false);
+            memParams.insert("interleave_size", ilSize, false);
+            memParams.insert("interleave_step", ilStep, false);
+            linkDown_ = loadAnonymousSubComponent<MemLinkBase>("memHierarchy.MemLink", "lowlink", 0, ComponentInfo::SHARE_PORTS | ComponentInfo::INSERT_STATS, memParams, &defaultTimeBase);
+            if (!linkDown_) {
+                dbg.fatal(CALL_INFO, -1, "%s, Error creating link to memory from directory controller\n", getName().c_str());
+            }
+            linkDown_->setRecvHandler(new Event::Handler2<DirectoryController, &DirectoryController::handlePacket>(this));
         } else {
-            if (params.find<std::string>("net_memory_name", "") != "")
-                dbg.fatal(CALL_INFO, -1, "%s, Error: parameter 'net_memory_name' is no longer supported. Memory and directory components should specify their own address regions (address_range_start/end, interleave_step/size) and mapping will be inferred from that. Remove this parameter from your input deck to eliminate this error.\n", getName().c_str());
-
-            memLink = nullptr;
+            // No linkDown_, traffic to/from memory will use the linkUp_
+            linkDown_ = nullptr;
         }
     }
 
-    if (memLink)
-        clockMemLink = memLink->isClocked();
+    if (linkDown_)
+        clockLinkDown_ = linkDown_->isClocked();
     else
-        clockMemLink = false;
-    clockCpuLink = cpuLink->isClocked();
+        clockLinkDown_ = false;
+    clockLinkUp_ = linkUp_->isClocked();
 
     // Requests per cycle
     maxRequestsPerCycle = params.find<int>("max_requests_per_cycle", 0);
@@ -258,8 +296,10 @@ DirectoryController::DirectoryController(ComponentId_t id, Params &params) :
     stat_eventRecv[(int)Command::ForceInv]      = registerStatistic<uint64_t>("ForceInv_recv");
     stat_eventRecv[(int)Command::FetchInv]      = registerStatistic<uint64_t>("FetchInv_recv");
     stat_eventRecv[(int)Command::AckInv]        = registerStatistic<uint64_t>("AckInv_recv");
+    stat_eventRecv[(int)Command::AckFlush]      = registerStatistic<uint64_t>("AckFlush_recv");
     stat_eventRecv[(int)Command::FlushLine]     = registerStatistic<uint64_t>("FlushLine_recv");
     stat_eventRecv[(int)Command::FlushLineInv]  = registerStatistic<uint64_t>("FlushLineInv_recv");
+    stat_eventRecv[(int)Command::FlushAll]      = registerStatistic<uint64_t>("FlushAll_recv");
     stat_eventRecv[(int)Command::FlushLineResp] = registerStatistic<uint64_t>("FlushLineResp_recv");
     stat_noncacheRecv[(int)Command::GetS]       = registerStatistic<uint64_t>("GetS_uncache_recv");
     stat_noncacheRecv[(int)Command::Write]      = registerStatistic<uint64_t>("Write_uncache_recv");
@@ -279,6 +319,7 @@ DirectoryController::DirectoryController(ComponentId_t id, Params &params) :
     stat_eventSent[(int)Command::FetchInv]      = registerStatistic<uint64_t>("eventSent_FetchInv");
     stat_eventSent[(int)Command::FetchInvX]     = registerStatistic<uint64_t>("eventSent_FetchInvX");
     stat_eventSent[(int)Command::ForceInv]      = registerStatistic<uint64_t>("eventSent_ForceInv");
+    stat_eventSent[(int)Command::ForwardFlush]  = registerStatistic<uint64_t>("eventSent_ForwardFlush");
     stat_eventSent[(int)Command::NACK]          = registerStatistic<uint64_t>("eventSent_NACK");
     stat_eventSent[(int)Command::GetSResp]      = registerStatistic<uint64_t>("eventSent_GetSResp");
     stat_eventSent[(int)Command::GetXResp]      = registerStatistic<uint64_t>("eventSent_GetXResp");
@@ -289,6 +330,8 @@ DirectoryController::DirectoryController(ComponentId_t id, Params &params) :
     stat_eventSent[(int)Command::FlushLine]     = registerStatistic<uint64_t>("eventSent_FlushLine");
     stat_eventSent[(int)Command::FlushLineInv]  = registerStatistic<uint64_t>("eventSent_FlushLineInv");
     stat_eventSent[(int)Command::FlushLineResp] = registerStatistic<uint64_t>("eventSent_FlushLineResp");
+    stat_eventSent[(int)Command::FlushAllResp]  = registerStatistic<uint64_t>("eventSent_FlushAllResp");
+    stat_eventSent[(int)Command::UnblockFlush]  = registerStatistic<uint64_t>("eventSent_UnblockFlush");
     // Memory writes from directory
     stat_dirEntryReads              = registerStatistic<uint64_t>("eventSent_read_directory_entry");
     stat_dirEntryWrites             = registerStatistic<uint64_t>("eventSent_write_directory_entry");
@@ -296,8 +339,8 @@ DirectoryController::DirectoryController(ComponentId_t id, Params &params) :
 
     // Coherence part
 
-    if (!memLink)
-        memLink = cpuLink;
+    if (!linkDown_)
+        linkDown_ = linkUp_;
 
     // TODO implement the cache properly using the cacheArray
     entryCacheMaxSize = params.find<uint64_t>("entry_cache_size", 32768);
@@ -316,6 +359,8 @@ DirectoryController::DirectoryController(ComponentId_t id, Params &params) :
     /* Get latencies */
     accessLatency   = params.find<uint64_t>("access_latency_cycles", 0);
     mshrLatency     = params.find<uint64_t>("mshr_latency_cycles", 0);
+
+    flush_state_ = FlushState::Ready;
 }
 
 
@@ -339,7 +384,7 @@ void DirectoryController::handlePacket(SST::Event *event){
     /* Forward events that we don't handle */
     if (MemEventTypeArr[(int)evb->getCmd()] != MemEventType::Cache || evb->queryFlag(MemEvent::F_NONCACHEABLE)) {
 
-        if (is_debug_event(evb)) {
+        if (mem_h_is_debug_event(evb)) {
             dbg.debug(_L3_, "E: %-20" PRIu64 " %-20" PRIu64 " %-20s Event:New     (%s)\n",
                     getCurrentSimCycle(), timestamp, getName().c_str(), evb->getVerboseString(dlevel).c_str());
         }
@@ -368,10 +413,10 @@ bool DirectoryController::clock(SST::Cycle_t cycle){
     sendOutgoingEvents();
 
     bool idle = true;
-    if (clockCpuLink)
-        idle &= cpuLink->clock();
-    if (clockMemLink)
-        idle &= memLink->clock();
+    if (clockLinkUp_)
+        idle &= linkUp_->clock();
+    if (clockLinkDown_)
+        idle &= linkDown_->clock();
 
     int requestsThisCycle = 0;
 
@@ -429,21 +474,21 @@ bool DirectoryController::clock(SST::Cycle_t cycle){
 
 bool DirectoryController::processPacket(MemEvent * ev, bool replay) {
     bool dbgevent = false;
-    if (is_debug_event(ev)) {
+    if (mem_h_is_debug_event(ev)) {
         fflush(stdout);
         dbgevent = true;
     }
 
     if(! isRequestAddressValid(ev->getAddr()) ) {
 	dbg.fatal(CALL_INFO, -1, "%s, Error: Request address is not valid. Event: %s. Time = %" PRIu64 "ns.\nRegion is %s\n",
-                getName().c_str(), ev->getVerboseString(dlevel).c_str(), getCurrentSimTimeNano(), cpuLink->getRegion().toString().c_str());
+                getName().c_str(), ev->getVerboseString(dlevel).c_str(), getCurrentSimTimeNano(), linkUp_->getRegion().toString().c_str());
     }
 
     Addr addr = ev->getBaseAddr();
 
     /* Disallow more than one access to a given line per cycle */
     if (!arbitrateAccess(addr)) {
-        if (is_debug_addr(addr)) {
+        if (mem_h_is_debug_addr(addr)) {
             std::stringstream id;
             id << "<" << ev->getID().first << "," << ev->getID().second << ">";
             dbg.debug(_L5_, "A: %-20" PRIu64 " %-20" PRIu64 " %-20s %-13s 0x%-16" PRIx64 " %-15s %-6s %-6s %-10s %-15s\n",
@@ -496,6 +541,9 @@ bool DirectoryController::processPacket(MemEvent * ev, bool replay) {
         case Command::FlushLine:
             retval = handleFlushLine(ev, replay);
             break;
+        case Command::FlushAll:
+            retval = handleFlushAll(ev, replay);
+            break;
         case Command::FetchInv:
             retval = handleFetchInv(ev, replay);
             break;
@@ -513,6 +561,9 @@ bool DirectoryController::processPacket(MemEvent * ev, bool replay) {
             break;
         case Command::FlushLineResp:
             retval = handleFlushLineResp(ev, replay);
+            break;
+        case Command::AckFlush:
+            retval = handleAckFlush(ev, replay);
             break;
         case Command::AckInv:
             retval = handleAckInv(ev, replay);
@@ -589,14 +640,14 @@ void DirectoryController::printStatus(Output &statusOut) {
         mshr->printStatus(statusOut);
     }
 
-    if (cpuLink) {
+    if (linkUp_) {
         statusOut.output("  NIC Status: ");
-        cpuLink->printStatus(statusOut);
+        linkUp_->printStatus(statusOut);
     }
 
-    if (memLink != cpuLink) {
+    if (linkDown_ != linkUp_) {
         statusOut.output("  Memory Link Status: ");
-        memLink->printStatus(statusOut);
+        linkDown_->printStatus(statusOut);
     }
 
     statusOut.output("  Directory entries:\n");
@@ -613,13 +664,13 @@ void DirectoryController::emergencyShutdown() {
             out.setOutputLocation(Output::STDERR);
         printStatus(out);
         out.output("   Checking for unreceived events on network link:\n");
-        cpuLink->emergencyShutdownDebug(out);
+        linkUp_->emergencyShutdownDebug(out);
     }
 }
 
 
 bool DirectoryController::isRequestAddressValid(Addr addr){
-    return cpuLink->isRequestAddressValid(addr);
+    return linkUp_->isRequestAddressValid(addr);
 }
 
 
@@ -634,86 +685,168 @@ void DirectoryController::turnClockOn() {
 
 void DirectoryController::init(unsigned int phase) {
 
-    cpuLink->init(phase);
-    if (cpuLink != memLink) memLink->init(phase);
+    linkUp_->init(phase);
+    if (linkUp_ != linkDown_) linkDown_->init(phase);
 
 
     // Must happen after network init or merlin croaks
     // InitData: Name, NULLCMD, Endpoint type, inclusive of all upper levels, will send writeback acks, line size
     if (!phase) {
-        if (cpuLink != memLink)
-            cpuLink->sendUntimedData(new MemEventInitCoherence(getName(), Endpoint::Directory, true, true, false, cacheLineSize, true));
-        memLink->sendUntimedData(new MemEventInitCoherence(getName(), Endpoint::Directory, true, true, false, cacheLineSize, true));
+        if (linkUp_ != linkDown_)
+            linkUp_->sendUntimedData(new MemEventInitCoherence(getName(), Endpoint::Directory, true, true, false, cacheLineSize, true));
+        linkDown_->sendUntimedData(new MemEventInitCoherence(getName(), Endpoint::Directory, true, true, false, cacheLineSize, true));
     }
 
     /* Pass data on to memory */
-    while(MemEventInit *ev = cpuLink->recvUntimedData()) {
+    while(MemEventInit *ev = linkUp_->recvUntimedData()) {
         if (ev->getCmd() == Command::NULLCMD) {
-            dbg.debug(_L10_, "I: %-20s   Event:Init      (%s)\n",
+            dbg.debug(_L10_, "U: %-20s   Event:Untimed   (%s)\n",
                 getName().c_str(), ev->getVerboseString(dlevel).c_str());
             if (ev->getInitCmd() == MemEventInit::InitCommand::Coherence) {
                 MemEventInitCoherence * mEv = static_cast<MemEventInitCoherence*>(ev);
                 if (mEv->getType() == Endpoint::Scratchpad)
                     waitWBAck = true;
-                if (!(mEv->getTracksPresence()) && cpuLink->isSource(mEv->getSrc())) {
+                if (!(mEv->getTracksPresence()) && linkUp_->isSource(mEv->getSrc())) {
                     incoherentSrc.insert(mEv->getSrc());
                 }
             } else if (ev->getInitCmd() == MemEventInit::InitCommand::Endpoint) {
                 MemEventInit * mEv = ev->clone();
                 mEv->setSrc(getName());
-                memLink->sendUntimedData(mEv);
+                linkDown_->sendUntimedData(mEv);
             }
             delete ev;
         } else {
-            dbg.debug(_L10_, "I: %-20s   Event:Init      (%s)\n",
+            dbg.debug(_L10_, "U: %-20s   Event:Untimed   (%s)\n",
                     getName().c_str(), ev->getVerboseString(dlevel).c_str());
-            if (isRequestAddressValid(ev->getAddr())){
-                dbg.debug(_L10_, "I: %-20s   Event:SendInitData    %" PRIx64 "\n",
-                        getName().c_str(), ev->getAddr());
-                memLink->sendUntimedData(ev, false);
-            } else
-                delete ev;
-
+            if (BasicCommandClassArr[(int)ev->getCmd()] == BasicCommandClass::Request) {
+                if (isRequestAddressValid(ev->getAddr())) {
+                    dbg.debug(_L10_, "U: %-20s   Event:SendInitData    %" PRIx64 "\n",
+                            getName().c_str(), ev->getAddr());
+                    if (ev->getCmd() == Command::GetS) // Will need to route a response back to sender
+                        init_requests_.insert(std::make_pair(ev->getID(), ev->getSrc()));
+                    ev->setSrc(getName());
+                    linkDown_->sendUntimedData(ev, false);
+                } else
+                    delete ev;
+            } else {
+                ev->setSrc(getName());
+                ev->setDst(init_requests_.find(ev->getID())->second);
+                init_requests_.erase(ev->getID());
+                linkDown_->sendUntimedData(ev, false, false);
+            }
         }
-
     }
 
-    SST::Event * ev;
-    if (cpuLink != memLink) {
-        while ((ev = memLink->recvUntimedData())) {
-            MemEventInit * initEv = dynamic_cast<MemEventInit*>(ev);
-            if (initEv && initEv->getCmd() == Command::NULLCMD) {
-                dbg.debug(_L10_, "I: %-20s   Event:Init      (%s)\n",
-                        getName().c_str(), initEv->getVerboseString(dlevel).c_str());
-
-                if (initEv->getInitCmd() == MemEventInit::InitCommand::Coherence) {
-                    MemEventInitCoherence * mEv = static_cast<MemEventInitCoherence*>(initEv);
+    if (linkUp_ != linkDown_) {
+        while(MemEventInit *ev = linkDown_->recvUntimedData()) {
+            dbg.debug(_L10_, "U: %-20s   Event:Untimed   (%s)\n",
+                getName().c_str(), ev->getVerboseString(dlevel).c_str());
+            if (ev->getCmd() == Command::NULLCMD) { // MemHierarchy Configuration Event
+                if (ev->getInitCmd() == MemEventInit::InitCommand::Coherence) {
+                    MemEventInitCoherence * mEv = static_cast<MemEventInitCoherence*>(ev);
                     if (mEv->getSendWBAck())
                         waitWBAck = true;
-                } else if (initEv->getInitCmd() == MemEventInit::InitCommand::Endpoint) {
-                    MemEventInit * mEv = initEv->clone();
+                } else if (ev->getInitCmd() == MemEventInit::InitCommand::Endpoint) {
+                    MemEventInit * mEv = ev->clone();
                     mEv->setSrc(getName());
-                    cpuLink->sendUntimedData(mEv);
+                    linkUp_->sendUntimedData(mEv);
                 }
-            }
-            delete ev;
-        }
+                delete ev;
+            } else if (ev->getInitCmd() == MemEventInit::InitCommand::Data) { // Data Initializaiton Event
+                if (BasicCommandClassArr[(int)ev->getCmd()] == BasicCommandClass::Request) { // Request
+                    if (isRequestAddressValid(ev->getAddr())) {
+                        if (ev->getCmd() == Command::GetS) // Will need to route a response back to sender
+                            init_requests_.insert(std::make_pair(ev->getID(), ev->getSrc()));
+                        ev->setSrc(getName());
+                        linkUp_->sendUntimedData(ev, false);
+                    } else delete ev;
+                } else {    // Response
+                    ev->setSrc(getName());
+                    ev->setDst(init_requests_.find(ev->getID())->second);
+                    init_requests_.erase(ev->getID());
+                    linkUp_->sendUntimedData(ev, false, false);
+                }
+            } else { delete ev; }
+        } 
     }
 }
 
+
+void DirectoryController::complete(unsigned int phase) {
+    if (phase == 0) flush_state_ = FlushState::Ready;
+
+        // Case: 1 link
+    if (linkUp_ == linkDown_) {
+        linkDown_->complete(phase);
+
+        while(MemEventInit *event = linkDown_->recvUntimedData()) {
+            dbg.debug(_L10_, "U: %-20s   Event:Untimed   (%s)\n",
+                getName().c_str(), event->getVerboseString(dlevel).c_str());
+            processCompleteEvent(event);
+        }
+        return;
+    }
+
+    // Case: 2 links
+    linkUp_->complete(phase);
+    linkDown_->complete(phase);
+
+    while (MemEventInit * event = linkUp_->recvUntimedData()) {
+        dbg.debug(_L10_, "U: %-20s   Event:Untimed   (%s)\n",
+            getName().c_str(), event->getVerboseString(dlevel).c_str());
+        processCompleteEvent(event);
+    }
+
+    while (MemEventInit * event = linkDown_->recvUntimedData()) {
+        dbg.debug(_L10_, "U: %-20s   Event:Untimed   (%s)\n",
+            getName().c_str(), event->getVerboseString(dlevel).c_str());
+        processCompleteEvent(event);
+    }
+}
 
 
 void DirectoryController::finish(void){
-    cpuLink->finish();
+    linkUp_->finish();
 }
 
 
-
 void DirectoryController::setup(void){
-    cpuLink->setup();
-    if (cpuLink != memLink)
-        memLink->setup();
-    //MemLinkBase * mem = memLink ? memLink : network;
+    linkUp_->setup();
+    if (linkUp_ != linkDown_)
+        linkDown_->setup();
+
+    auto peers = linkUp_->getPeers();
+    MemLinkBase::EndpointInfo min = linkUp_->getEndpointInfo();
+    bool isFlushManager = true;
+    for (auto it = peers->begin(); it != peers->end(); it++) {
+        if (*it < min) {
+            isFlushManager = false;
+            min = *it;
+        }
+    }
+}
+
+
+void DirectoryController::processCompleteEvent(MemEventInit* event) {
+    if (event->getInitCmd() == MemEventInit::InitCommand::Flush) {
+        MemEventUntimedFlush* flush = static_cast<MemEventUntimedFlush*>(event);
+
+        if ( flush->request() && flush_state_ == FlushState::Ready ) {
+            flush_state_ = FlushState::Invalidate;
+            std::set<MemLinkBase::EndpointInfo>* src = linkUp_->getSources();
+            for (auto it = src->begin(); it != src->end(); it++) {
+                MemEventUntimedFlush* forward = new MemEventUntimedFlush(getName());
+                forward->setDst(it->name);
+                linkUp_->sendUntimedData(forward, false, false);
+            }
+        }
+        delete event;
+    } else if (event->getCmd() == Command::Write ) {
+        event->setSrc(getName());
+        linkDown_->sendUntimedData(event, false, true);
+    } else {
+        delete event; // Nothing for now
+    }
 }
 
 
@@ -729,12 +862,12 @@ bool DirectoryController::handleGetS(MemEvent * event, bool inMSHR) {
     bool cached = entry->isCached();
     MemEventStatus status = MemEventStatus::OK;
 
-    if (is_debug_addr(addr))
+    if (mem_h_is_debug_addr(addr))
         eventDI.prefill(event->getID(), Command::GetS, false, addr, state);
 
     if (!cached) {
         bool ret = retrieveDirEntry(entry, event, inMSHR); 
-        if (is_debug_addr(addr)) {
+        if (mem_h_is_debug_addr(addr)) {
             eventDI.newst = entry->getState();
             eventDI.verboseline = entry->getString();
         }
@@ -765,7 +898,7 @@ bool DirectoryController::handleGetS(MemEvent * event, bool inMSHR) {
                         entry->addSharer(event->getSrc());
                         sendDataResponse(event, entry, mshr->getData(addr), Command::GetSResp);
                     }
-                    if (is_debug_event(event)) {
+                    if (mem_h_is_debug_event(event)) {
                         eventDI.reason = "hit";
                         eventDI.action = "Done";
                     }
@@ -778,7 +911,7 @@ bool DirectoryController::handleGetS(MemEvent * event, bool inMSHR) {
             if (status == MemEventStatus::OK) {
                 issueMemoryRequest(event, entry, true);
                 entry->setState(IS);
-                if (is_debug_event(event))
+                if (mem_h_is_debug_event(event))
                     eventDI.reason = "miss";
             }
             break;
@@ -788,7 +921,7 @@ bool DirectoryController::handleGetS(MemEvent * event, bool inMSHR) {
                     entry->addSharer(event->getSrc());
                 }
                 sendDataResponse(event, entry, mshr->getData(addr), Command::GetSResp);
-                if (is_debug_event(event)) {
+                if (mem_h_is_debug_event(event)) {
                     eventDI.reason = "hit";
                     eventDI.action = "Done";
                 }
@@ -800,12 +933,12 @@ bool DirectoryController::handleGetS(MemEvent * event, bool inMSHR) {
                 issueMemoryRequest(event, entry, true);
                 entry->setState(S_D);
             }
-            if (is_debug_event(event))
+            if (mem_h_is_debug_event(event))
                 eventDI.reason = "hit";
             break;
         case M:
             status = inMSHR ? MemEventStatus::OK : allocateMSHR(event, false);
-            if (is_debug_event(event))
+            if (mem_h_is_debug_event(event))
                 eventDI.reason = "hit";
             if (status == MemEventStatus::OK) {
                 issueFetch(event, entry, Command::FetchInvX);
@@ -820,7 +953,7 @@ bool DirectoryController::handleGetS(MemEvent * event, bool inMSHR) {
     if (status == MemEventStatus::Reject)
         sendNACK(event);
 
-    if (is_debug_addr(addr)) {
+    if (mem_h_is_debug_addr(addr)) {
         eventDI.newst = entry->getState();
         eventDI.verboseline = entry->getString();
     }
@@ -841,12 +974,12 @@ bool DirectoryController::handleGetX(MemEvent * event, bool inMSHR) {
     bool cached = entry->isCached();
     MemEventStatus status = MemEventStatus::OK;
 
-    if (is_debug_addr(addr))
+    if (mem_h_is_debug_addr(addr))
         eventDI.prefill(event->getID(), event->getCmd(), false, addr, state);
 
     if (!cached) {
         bool ret = retrieveDirEntry(entry, event, inMSHR); 
-        if (is_debug_addr(addr)) {
+        if (mem_h_is_debug_addr(addr)) {
             eventDI.newst = entry->getState();
             eventDI.verboseline = entry->getString();
         }
@@ -869,9 +1002,21 @@ bool DirectoryController::handleGetX(MemEvent * event, bool inMSHR) {
                         entry->setState(M);
                         entry->setOwner(event->getSrc());
                     }
-                    sendDataResponse(event, entry, mshr->getData(addr), Command::GetXResp);
+
+                    auto data = mshr->getData(addr);
+                    std::stringstream value;
+                    value << std::hex << std::setfill('0');
+                    for (unsigned int i = 0; i < data.size(); i++) {
+                        value << std::hex << std::setw(2) << (int)data.at(i);
+                    }
+    
+                    dbg.debug(_L11_, "V: %-20" PRIu64 " %-20" PRIu64 " %-20s %-13s 0x%-16" PRIx64 " B: %-3zu %s\n",
+                        getCurrentSimCycle(), timestamp, getName().c_str(), "READ", 
+                        addr, data.size(), value.str().c_str());
+
+                    sendDataResponse(event, entry, data, Command::GetXResp);
                     mshr->clearData(addr);
-                    if (is_debug_event(event)) {
+                    if (mem_h_is_debug_event(event)) {
                         eventDI.reason = "hit";
                         eventDI.action = "Done";
                     }
@@ -883,7 +1028,7 @@ bool DirectoryController::handleGetX(MemEvent * event, bool inMSHR) {
             if (status == MemEventStatus::OK) {
                 entry->setState(IM);
                 issueMemoryRequest(event, entry, true);
-                if (is_debug_event(event))
+                if (mem_h_is_debug_event(event))
                     eventDI.reason = "miss";
             }
             break;
@@ -900,7 +1045,7 @@ bool DirectoryController::handleGetX(MemEvent * event, bool inMSHR) {
                     entry->removeSharer(event->getSrc());
                     entry->setOwner(event->getSrc());
                     sendResponse(event);
-                    if (is_debug_event(event)) {
+                    if (mem_h_is_debug_event(event)) {
                         eventDI.reason = "hit";
                         eventDI.action = "Done";
                     }
@@ -913,7 +1058,7 @@ bool DirectoryController::handleGetX(MemEvent * event, bool inMSHR) {
                         mshr->clearData(addr);
                     entry->setState(S_Inv);
                     issueInvalidations(event, entry, Command::Inv);
-                    if (is_debug_event(event)) {
+                    if (mem_h_is_debug_event(event)) {
                         eventDI.reason = "miss";
                     }
                 }
@@ -927,7 +1072,7 @@ bool DirectoryController::handleGetX(MemEvent * event, bool inMSHR) {
                         issueMemoryRequest(event, entry, true);
                     }
                     issueInvalidations(event, entry, Command::Inv);
-                    if (is_debug_event(event)) {
+                    if (mem_h_is_debug_event(event)) {
                         eventDI.reason = "miss";
                     }
                 }
@@ -938,7 +1083,7 @@ bool DirectoryController::handleGetX(MemEvent * event, bool inMSHR) {
             if (status == MemEventStatus::OK) {
                 entry->setState(M_Inv);
                 issueFetch(event, entry, Command::FetchInv);
-                if (is_debug_event(event)) {
+                if (mem_h_is_debug_event(event)) {
                     eventDI.reason = "miss";
                 }
             }
@@ -949,7 +1094,7 @@ bool DirectoryController::handleGetX(MemEvent * event, bool inMSHR) {
             break;
     }
 
-    if (is_debug_addr(addr)) {
+    if (mem_h_is_debug_addr(addr)) {
         eventDI.newst = entry->getState();
         eventDI.verboseline = entry->getString();
     }
@@ -969,12 +1114,12 @@ bool DirectoryController::handleWrite(MemEvent * event, bool inMSHR) {
     bool cached = entry->isCached();
     MemEventStatus status = MemEventStatus::OK;
 
-    if (is_debug_addr(addr))
+    if (mem_h_is_debug_addr(addr))
         eventDI.prefill(event->getID(), event->getCmd(), false, addr, state);
 
     if (!cached) {
         bool ret = retrieveDirEntry(entry, event, inMSHR); 
-        if (is_debug_addr(addr)) {
+        if (mem_h_is_debug_addr(addr)) {
             eventDI.newst = entry->getState();
             eventDI.verboseline = entry->getString();
         }
@@ -1011,7 +1156,7 @@ bool DirectoryController::handleWrite(MemEvent * event, bool inMSHR) {
             if (status == MemEventStatus::OK) {
                 entry->setState(S_Inv);
                 issueInvalidations(event, entry, Command::Inv);
-                if (is_debug_event(event)) {
+                if (mem_h_is_debug_event(event)) {
                     eventDI.reason = "inv";
                 }
             }
@@ -1028,7 +1173,7 @@ bool DirectoryController::handleWrite(MemEvent * event, bool inMSHR) {
             if (status == MemEventStatus::OK) {
                 entry->setState(M_Inv);
                 issueFetch(event, entry, Command::FetchInv);
-                if (is_debug_event(event)) {
+                if (mem_h_is_debug_event(event)) {
                     eventDI.reason = "miss";
                 }
             }
@@ -1039,7 +1184,7 @@ bool DirectoryController::handleWrite(MemEvent * event, bool inMSHR) {
             break;
     }
 
-    if (is_debug_addr(addr)) {
+    if (mem_h_is_debug_addr(addr)) {
         eventDI.newst = entry->getState();
         eventDI.verboseline = entry->getString();
     }
@@ -1057,12 +1202,12 @@ bool DirectoryController::handleFlushLine(MemEvent* event, bool inMSHR) {
     bool cached = entry->isCached();
     MemEventStatus status = MemEventStatus::OK;
 
-    if (is_debug_addr(addr))
+    if (mem_h_is_debug_addr(addr))
         eventDI.prefill(event->getID(), Command::FlushLine, false, addr, state);
 
     if (!cached) {
         bool ret = retrieveDirEntry(entry, event, inMSHR); 
-        if (is_debug_addr(addr)) {
+        if (mem_h_is_debug_addr(addr)) {
             eventDI.newst = entry->getState();
             eventDI.verboseline = entry->getString();
         }
@@ -1130,7 +1275,7 @@ bool DirectoryController::handleFlushLine(MemEvent* event, bool inMSHR) {
     if (status == MemEventStatus::Reject)
         sendNACK(event);
 
-    if (is_debug_addr(addr)) {
+    if (mem_h_is_debug_addr(addr)) {
         eventDI.newst = entry->getState();
         eventDI.verboseline = entry->getString();
     }
@@ -1146,12 +1291,12 @@ bool DirectoryController::handleFlushLineInv(MemEvent* event, bool inMSHR) {
     bool cached = entry->isCached();
     MemEventStatus status = MemEventStatus::OK;
 
-    if (is_debug_addr(addr))
+    if (mem_h_is_debug_addr(addr))
         eventDI.prefill(event->getID(), Command::FlushLineInv, false, addr, state);
 
     if (!cached) {
         bool ret = retrieveDirEntry(entry, event, inMSHR); 
-        if (is_debug_addr(addr)) {
+        if (mem_h_is_debug_addr(addr)) {
             eventDI.newst = entry->getState();
             eventDI.verboseline = entry->getString();
         }
@@ -1286,9 +1431,71 @@ bool DirectoryController::handleFlushLineInv(MemEvent* event, bool inMSHR) {
     if (status == MemEventStatus::Reject)
         sendNACK(event);
 
-    if (is_debug_addr(addr)) {
+    if (mem_h_is_debug_addr(addr)) {
         eventDI.newst = entry->getState();
         eventDI.verboseline = entry->getString();
+    }
+
+    return true;
+}
+
+bool DirectoryController::handleFlushAll(MemEvent * event, bool inMSHR) {
+    eventDI.prefill(event->getID(), Command::FlushAll, false, 0, State::NP);
+    /* If directory receives a FlushAll, it is the flush manager
+     * The cache flushes will be sufficient to flush data to memory
+     * so the directory only needs to order FlushAll requests
+     */
+    if (!inMSHR) {
+        MemEventStatus status = mshr->insertFlush(event, false);
+        if (status == MemEventStatus::Reject) {
+            sendNACK(event);
+            return true;
+        } else if (status == MemEventStatus::Stall) {
+            eventDI.action = "Stall";
+            eventDI.reason = "Flush in progress";
+            return true;
+        }
+    }
+    
+    switch (flush_state_) {
+        case FlushState::Ready:
+        {
+            /* Broadcast request up, transition to FlushState::Forward */
+            std::set<MemLinkBase::EndpointInfo>* sources = linkUp_->getSources();
+            for (auto it = sources->begin(); it != sources->end(); it++) {
+                MemEvent* bcast_event = new MemEvent(getName(), Command::ForwardFlush);
+                bcast_event->copyMetadata(event);
+                bcast_event->setSrc(getName());
+                bcast_event->setDst(it->name);
+                forwardByDestination(bcast_event, timestamp + mshrLatency);
+            }
+            mshr->incrementFlushCount(sources->size());
+            flush_state_ = FlushState::Forward;
+            eventDI.action = "Begin";
+            break;
+        }
+        case FlushState::Forward:
+        {
+            /* Have received all acks, signal that flush is done */
+            sendResponse(event);
+            std::set<MemLinkBase::EndpointInfo>* sources = linkUp_->getSources();
+            for (auto it = sources->begin(); it != sources->end(); it++) {
+                MemEvent* bcast_event = new MemEvent(getName(), Command::UnblockFlush);
+                bcast_event->copyMetadata(event);
+                bcast_event->setSrc(getName());
+                bcast_event->setDst(it->name);
+                forwardByDestination(bcast_event, timestamp + mshrLatency);
+            }
+            mshr->removeFlush();
+            delete event;
+            if (mshr->getFlush() != nullptr) {
+                retryBuffer.push_back(static_cast<MemEvent*>(mshr->getFlush()));
+            }
+            flush_state_ = FlushState::Ready;
+            break;
+        }
+        default:
+            break;
     }
 
     return true;
@@ -1300,12 +1507,12 @@ bool DirectoryController::handlePutS(MemEvent * event, bool inMSHR) {
     State state = entry->getState();
     bool cached = entry->isCached();
 
-    if (is_debug_addr(addr))
+    if (mem_h_is_debug_addr(addr))
         eventDI.prefill(event->getID(), Command::PutS, false, addr, state);
 
     if (!cached) {
         bool ret = retrieveDirEntry(entry, event, inMSHR); 
-        if (is_debug_addr(addr)) {
+        if (mem_h_is_debug_addr(addr)) {
             eventDI.newst = entry->getState();
             eventDI.verboseline = entry->getString();
         }
@@ -1364,7 +1571,7 @@ bool DirectoryController::handlePutS(MemEvent * event, bool inMSHR) {
 
     cleanUpAfterRequest(event, inMSHR);
 
-    if (is_debug_addr(addr)) {
+    if (mem_h_is_debug_addr(addr)) {
         eventDI.newst = entry->getState();
         eventDI.verboseline = entry->getString();
     }
@@ -1382,12 +1589,12 @@ bool DirectoryController::handlePutX(MemEvent * event, bool inMSHR) {
     State state = entry->getState();
     bool cached = entry->isCached();
 
-    if (is_debug_addr(addr))
+    if (mem_h_is_debug_addr(addr))
         eventDI.prefill(event->getID(), Command::PutX, false, addr, state);
 
     if (!cached) {
         bool ret = retrieveDirEntry(entry, event, inMSHR); 
-        if (is_debug_addr(addr)) {
+        if (mem_h_is_debug_addr(addr)) {
             eventDI.newst = entry->getState();
             eventDI.verboseline = entry->getString();
         }
@@ -1427,7 +1634,7 @@ bool DirectoryController::handlePutX(MemEvent * event, bool inMSHR) {
                     getName().c_str(), StateString[state], event->getVerboseString(dlevel).c_str(), getCurrentSimTimeNano());
     }
 
-    if (is_debug_addr(addr)) {
+    if (mem_h_is_debug_addr(addr)) {
         eventDI.newst = entry->getState();
         eventDI.verboseline = entry->getString();
     }
@@ -1444,12 +1651,12 @@ bool DirectoryController::handlePutE(MemEvent * event, bool inMSHR) {
     State state = entry->getState();
     bool cached = entry->isCached();
 
-    if (is_debug_addr(addr))
+    if (mem_h_is_debug_addr(addr))
         eventDI.prefill(event->getID(), Command::PutE, false, addr, state);
 
     if (!cached) {
         bool ret = retrieveDirEntry(entry, event, inMSHR); 
-        if (is_debug_addr(addr)) {
+        if (mem_h_is_debug_addr(addr)) {
             eventDI.newst = entry->getState();
             eventDI.verboseline = entry->getString();
         }
@@ -1482,7 +1689,7 @@ bool DirectoryController::handlePutE(MemEvent * event, bool inMSHR) {
                     getName().c_str(), StateString[state], event->getVerboseString(dlevel).c_str(), getCurrentSimTimeNano());
     }
 
-    if (is_debug_addr(addr)) {
+    if (mem_h_is_debug_addr(addr)) {
         eventDI.newst = entry->getState();
         eventDI.verboseline = entry->getString();
     }
@@ -1499,12 +1706,12 @@ bool DirectoryController::handlePutM(MemEvent * event, bool inMSHR) {
     State state = entry->getState();
     bool cached = entry->isCached();
 
-    if (is_debug_addr(addr))
+    if (mem_h_is_debug_addr(addr))
         eventDI.prefill(event->getID(), Command::PutM, false, addr, state);
 
     if (!cached) {
         bool ret = retrieveDirEntry(entry, event, inMSHR); 
-        if (is_debug_addr(addr)) {
+        if (mem_h_is_debug_addr(addr)) {
             eventDI.newst = entry->getState();
             eventDI.verboseline = entry->getString();
         }
@@ -1538,7 +1745,7 @@ bool DirectoryController::handlePutM(MemEvent * event, bool inMSHR) {
                     getName().c_str(), StateString[state], event->getVerboseString(dlevel).c_str(), getCurrentSimTimeNano());
     }
 
-    if (is_debug_addr(addr)) {
+    if (mem_h_is_debug_addr(addr)) {
         eventDI.newst = entry->getState();
         eventDI.verboseline = entry->getString();
     }
@@ -1557,12 +1764,12 @@ bool DirectoryController::handleFetchInv(MemEvent * event, bool inMSHR) {
     bool cached = entry->isCached();
     MemEventStatus status = MemEventStatus::OK;
 
-    if (is_debug_addr(addr))
+    if (mem_h_is_debug_addr(addr))
         eventDI.prefill(event->getID(), Command::FetchInv, false, addr, state);
 
     if (!cached) {
         bool ret = retrieveDirEntry(entry, event, inMSHR); 
-        if (is_debug_addr(addr)) {
+        if (mem_h_is_debug_addr(addr)) {
             eventDI.newst = entry->getState();
             eventDI.verboseline = entry->getString();
         }
@@ -1652,7 +1859,7 @@ bool DirectoryController::handleFetchInv(MemEvent * event, bool inMSHR) {
                     getName().c_str(), StateString[state], event->getVerboseString(dlevel).c_str(), getCurrentSimTimeNano());
     }
 
-    if (is_debug_addr(addr)) {
+    if (mem_h_is_debug_addr(addr)) {
         eventDI.newst = entry->getState();
         eventDI.verboseline = entry->getString();
     }
@@ -1671,12 +1878,12 @@ bool DirectoryController::handleForceInv(MemEvent * event, bool inMSHR) {
     bool cached = entry->isCached();
     MemEventStatus status = MemEventStatus::OK;
 
-    if (is_debug_addr(addr))
+    if (mem_h_is_debug_addr(addr))
         eventDI.prefill(event->getID(), Command::ForceInv, false, addr, state);
 
     if (!cached) {
         bool ret = retrieveDirEntry(entry, event, inMSHR); 
-        if (is_debug_addr(addr)) {
+        if (mem_h_is_debug_addr(addr)) {
             eventDI.newst = entry->getState();
             eventDI.verboseline = entry->getString();
         }
@@ -1761,7 +1968,7 @@ bool DirectoryController::handleForceInv(MemEvent * event, bool inMSHR) {
 
     if (status == MemEventStatus::Reject)
         sendNACK(event);
-    if (is_debug_addr(addr)) {
+    if (mem_h_is_debug_addr(addr)) {
         eventDI.newst = entry->getState();
         eventDI.verboseline = entry->getString();
     }
@@ -1775,7 +1982,7 @@ bool DirectoryController::handleGetSResp(MemEvent * event, bool inMSHR) {
     State state = entry->getState();
     MemEventStatus status = MemEventStatus::OK;
 
-    if (is_debug_addr(addr))
+    if (mem_h_is_debug_addr(addr))
         eventDI.prefill(event->getID(), Command::GetSResp, false, addr, state);
 
     // Entry must be cached since we can't evict non-stable-state entries
@@ -1799,7 +2006,7 @@ bool DirectoryController::handleGetSResp(MemEvent * event, bool inMSHR) {
     mshr->setData(addr, event->getPayload(), false); // Save data for a subsequent GetS
     cleanUpAfterResponse(event, inMSHR);
 
-    if (is_debug_addr(addr)) {
+    if (mem_h_is_debug_addr(addr)) {
         eventDI.newst = entry->getState();
         eventDI.verboseline = entry->getString();
     }
@@ -1812,7 +2019,7 @@ bool DirectoryController::handleGetXResp(MemEvent * event, bool inMSHR) {
     DirEntry* entry = getDirEntry(addr);
     State state = entry ? entry->getState() : NP;
 
-    if (is_debug_addr(addr))
+    if (mem_h_is_debug_addr(addr))
         eventDI.prefill(event->getID(), Command::GetXResp, false, addr, state);
 
     MemEvent * reqEv = static_cast<MemEvent*>(mshr->getFrontEvent(addr));
@@ -1849,7 +2056,7 @@ bool DirectoryController::handleGetXResp(MemEvent * event, bool inMSHR) {
         case SM_Inv:
             entry->setState(S_Inv);
             mshr->setData(addr, event->getPayload(), false); // Save data for when the invalidations finish
-            if (is_debug_addr(addr)) {
+            if (mem_h_is_debug_addr(addr)) {
                 eventDI.newst = entry->getState();
                 eventDI.verboseline = entry->getString();
             }
@@ -1861,7 +2068,7 @@ bool DirectoryController::handleGetXResp(MemEvent * event, bool inMSHR) {
                     getName().c_str(), StateString[state], event->getVerboseString(dlevel).c_str(), getCurrentSimTimeNano());
     }
     cleanUpAfterResponse(event, inMSHR);
-    if (is_debug_addr(addr)) {
+    if (mem_h_is_debug_addr(addr)) {
         eventDI.newst = entry->getState();
         eventDI.verboseline = entry->getString();
     }
@@ -1874,7 +2081,7 @@ bool DirectoryController::handleWriteResp(MemEvent * event, bool inMSHR) {
     DirEntry* entry = getDirEntry(addr);
     State state = entry ? entry->getState() : NP;
 
-    if (is_debug_addr(addr))
+    if (mem_h_is_debug_addr(addr))
         eventDI.prefill(event->getID(), Command::WriteResp, false, addr, state);
 
     MemEvent * reqEv = static_cast<MemEvent*>(mshr->getFrontEvent(addr));
@@ -1889,7 +2096,7 @@ bool DirectoryController::handleWriteResp(MemEvent * event, bool inMSHR) {
     forwardByDestination(reqEv->makeResponse(), timestamp + mshrLatency);
     cleanUpAfterResponse(event, inMSHR);
 
-    if (is_debug_addr(addr)) {
+    if (mem_h_is_debug_addr(addr)) {
         eventDI.newst = entry->getState();
         eventDI.verboseline = entry->getString();
     }
@@ -1902,7 +2109,7 @@ bool DirectoryController::handleFlushLineResp(MemEvent * event, bool inMSHR) {
     DirEntry* entry = getDirEntry(addr);
     State state = entry->getState();
 
-    if (is_debug_addr(addr))
+    if (mem_h_is_debug_addr(addr))
         eventDI.prefill(event->getID(), Command::FlushLineResp, false, addr, state);
 
     MemEvent * reqEv = static_cast<MemEvent*>(mshr->getFrontEvent(addr));
@@ -1922,7 +2129,7 @@ bool DirectoryController::handleFlushLineResp(MemEvent * event, bool inMSHR) {
                     getName().c_str(), StateString[state], event->getVerboseString(dlevel).c_str(), getCurrentSimTimeNano());
     }
 
-    if (is_debug_addr(addr)) {
+    if (mem_h_is_debug_addr(addr)) {
         eventDI.newst = entry->getState();
         eventDI.verboseline = entry->getString();
     }
@@ -1932,15 +2139,27 @@ bool DirectoryController::handleFlushLineResp(MemEvent * event, bool inMSHR) {
     return true;
 }
 
+bool DirectoryController::handleAckFlush(MemEvent* event, bool inMSHR) {
+    eventDI.prefill(event->getID(), Command::AckFlush, "", 0, State::NP);
+    
+    mshr->decrementFlushCount();
+    if (mshr->getFlushCount() == 0) {
+        retryBuffer.push_back(static_cast<MemEvent*>(mshr->getFlush()));
+    }
+
+    delete event;
+    return true;
+}
+
 bool DirectoryController::handleAckPut(MemEvent* event, bool inMSHR) {
     Addr addr = event->getBaseAddr();
     DirEntry* entry = getDirEntry(addr);
     State state = entry->getState();
 
-    if (is_debug_addr(addr))
+    if (mem_h_is_debug_addr(addr))
         eventDI.prefill(event->getID(), Command::AckPut, false, addr, state);
 
-    if (is_debug_addr(addr)) {
+    if (mem_h_is_debug_addr(addr)) {
         eventDI.newst = entry->getState();
         eventDI.verboseline = entry->getString();
     }
@@ -1955,7 +2174,7 @@ bool DirectoryController::handleAckInv(MemEvent* event, bool inMSHR) {
     DirEntry* entry = getDirEntry(addr);
     State state = entry->getState();
 
-    if (is_debug_addr(addr))
+    if (mem_h_is_debug_addr(addr))
         eventDI.prefill(event->getID(), Command::AckInv, false, addr, state);
 
     if (entry->isSharer(event->getSrc()))
@@ -1998,7 +2217,7 @@ bool DirectoryController::handleAckInv(MemEvent* event, bool inMSHR) {
     }
     delete event;
 
-    if (is_debug_addr(addr)) {
+    if (mem_h_is_debug_addr(addr)) {
         eventDI.newst = entry->getState();
         eventDI.verboseline = entry->getString();
     }
@@ -2011,7 +2230,7 @@ bool DirectoryController::handleFetchXResp(MemEvent* event, bool inMSHR) {
     DirEntry* entry = getDirEntry(addr);
     State state = entry->getState();
 
-    if (is_debug_addr(addr))
+    if (mem_h_is_debug_addr(addr))
         eventDI.prefill(event->getID(), Command::FetchInvX, false, addr, state);
 
     if (state != M_InvX)
@@ -2031,7 +2250,7 @@ bool DirectoryController::handleFetchXResp(MemEvent* event, bool inMSHR) {
 
     delete event;
 
-    if (is_debug_addr(addr)) {
+    if (mem_h_is_debug_addr(addr)) {
         eventDI.newst = entry->getState();
         eventDI.verboseline = entry->getString();
     }
@@ -2044,7 +2263,7 @@ bool DirectoryController::handleFetchResp(MemEvent* event, bool inMSHR) {
     DirEntry* entry = getDirEntry(addr);
     State state = entry->getState();
 
-    if (is_debug_addr(addr))
+    if (mem_h_is_debug_addr(addr))
         eventDI.prefill(event->getID(), Command::FetchResp, false, addr, state);
 
     if (state != S_Inv && state != M_Inv)
@@ -2068,7 +2287,7 @@ bool DirectoryController::handleFetchResp(MemEvent* event, bool inMSHR) {
 
     delete event;
 
-    if (is_debug_addr(addr)) {
+    if (mem_h_is_debug_addr(addr)) {
         eventDI.newst = entry->getState();
         eventDI.verboseline = entry->getString();
     }
@@ -2081,7 +2300,7 @@ bool DirectoryController::handleNACK(MemEvent* event, bool inMSHR) {
     DirEntry* entry = getDirEntry(addr);
     State state = entry->getState();
 
-    if (is_debug_addr(addr))
+    if (mem_h_is_debug_addr(addr))
         eventDI.prefill(event->getID(), Command::NACK, false, addr, state);
 
     MemEvent * nackedEvent = event->getNACKedEvent();
@@ -2094,6 +2313,7 @@ bool DirectoryController::handleNACK(MemEvent* event, bool inMSHR) {
         case Command::PutM:
         case Command::FlushLine:
         case Command::FlushLineInv:
+        case Command::ForwardFlush:
             // Always retry
             break;
         case Command::FetchInv:
@@ -2114,7 +2334,7 @@ bool DirectoryController::handleNACK(MemEvent* event, bool inMSHR) {
     // Resend nack'd event
     forwardByDestination(nackedEvent, timestamp + mshrLatency);
 
-    if (is_debug_addr(addr)) {
+    if (mem_h_is_debug_addr(addr)) {
         eventDI.newst = entry->getState();
         eventDI.verboseline = entry->getString();
     }
@@ -2130,7 +2350,7 @@ bool DirectoryController::handleDirEntryResponse(MemEvent* event) {
     DirEntry* entry = getDirEntry(addr);
     State state = entry->getState();
 
-    if (is_debug_addr(addr))
+    if (mem_h_is_debug_addr(addr))
         eventDI.prefill(event->getID(), event->getCmd(), false, addr, state);
 
     switch (state) {
@@ -2153,7 +2373,7 @@ bool DirectoryController::handleDirEntryResponse(MemEvent* event) {
 
     delete event;
 
-    if (is_debug_addr(addr)) {
+    if (mem_h_is_debug_addr(addr)) {
         eventDI.newst = entry->getState();
         eventDI.verboseline = entry->getString();
     }
@@ -2220,13 +2440,13 @@ bool DirectoryController::retrieveDirEntry(DirEntry* entry, MemEvent* event, boo
 MemEventStatus DirectoryController::allocateMSHR(MemEvent* event, bool fwdReq, int pos) {
     int end_pos = mshr->insertEvent(event->getBaseAddr(), event, pos, fwdReq, false);
     if (end_pos == -1) {
-        if (is_debug_event(event)) {
+        if (mem_h_is_debug_event(event)) {
             eventDI.action = "Reject";
             eventDI.reason = "MSHR full";
         }
         return MemEventStatus::Reject; // MSHR is full
     } else if (end_pos != 0) {
-        if (is_debug_event(event)) {
+        if (mem_h_is_debug_event(event)) {
             eventDI.action = "Stall";
             eventDI.reason = "MSHR conflict";
         }
@@ -2315,7 +2535,7 @@ void DirectoryController::sendEntryToMemory(DirEntry *entry) {
     me->setFlag(MemEventBase::F_NORESPONSE);
 
     uint64_t deliveryTime = timestamp + accessLatency;
-    me->setDst(memLink->getTargetDestination(0));
+    me->setDst(linkDown_->getTargetDestination(0));
     memMsgQueue.insert(std::make_pair(deliveryTime, MemMsg(me, true)));
 }
 
@@ -2493,7 +2713,7 @@ void DirectoryController::sendOutgoingEvents() {
     while (!cpuMsgQueue.empty() && cpuMsgQueue.begin()->first <= timestamp) {
         MemEventBase * ev = cpuMsgQueue.begin()->second;
 
-        if (is_debug_event(ev)) {
+        if (mem_h_is_debug_event(ev)) {
             dbg.debug(_L4_, "E: %-20" PRIu64 " %-20" PRIu64 " %-20s Event:Send    (%s)\n",
                     getCurrentSimCycle(), timestamp, getName().c_str(), ev->getBriefString().c_str());
         }
@@ -2505,14 +2725,14 @@ void DirectoryController::sendOutgoingEvents() {
             startTimes.erase(ev->getResponseToID());
         }
         stat_eventSent[(int)ev->getCmd()]->addData(1);
-        cpuLink->send(ev);
+        linkUp_->send(ev);
         cpuMsgQueue.erase(cpuMsgQueue.begin());
     }
 
     while (!memMsgQueue.empty() && memMsgQueue.begin()->first <= timestamp) {
         MemEventBase * ev = memMsgQueue.begin()->second.event;
 
-        if (is_debug_event(ev)) {
+        if (mem_h_is_debug_event(ev)) {
             dbg.debug(_L4_, "E: %-20" PRIu64 " %-20" PRIu64 " %-20s Event:Send    (%s)\n",
                     getCurrentSimCycle(), timestamp, getName().c_str(), ev->getBriefString().c_str());
         }
@@ -2525,7 +2745,7 @@ void DirectoryController::sendOutgoingEvents() {
         } else {
             stat_eventSent[(int)ev->getCmd()]->addData(1);
         }
-        memLink->send(ev);
+        linkDown_->send(ev);
         memMsgQueue.erase(memMsgQueue.begin());
     }
 
@@ -2535,18 +2755,18 @@ void DirectoryController::sendOutgoingEvents() {
  * dirAccess has default value of false
  */
 void DirectoryController::forwardByAddress(MemEventBase * ev, Cycle_t ts, bool dirAccess) {
-    std::string dst = memLink->findTargetDestination(ev->getRoutingAddress());
+    std::string dst = linkDown_->findTargetDestination(ev->getRoutingAddress());
     if (dst != "") { /* Common case */
         ev->setDst(dst);
         memMsgQueue.insert(std::make_pair(ts, MemMsg(ev, dirAccess)));
     } else {
-        dst = cpuLink->findTargetDestination(ev->getRoutingAddress());
+        dst = linkUp_->findTargetDestination(ev->getRoutingAddress());
         if (dst != "") {
             ev->setDst(dst);
             cpuMsgQueue.insert(std::make_pair(ts, ev));
         } else {
-            std::string availableDests = "cpulink:\n" + cpuLink->getAvailableDestinationsAsString();
-            if (cpuLink != memLink) availableDests = availableDests + "memlink:\n" + memLink->getAvailableDestinationsAsString();
+            std::string availableDests = "highlink:\n" + linkUp_->getAvailableDestinationsAsString();
+            if (linkUp_ != linkDown_) availableDests = availableDests + "lowlink:\n" + linkDown_->getAvailableDestinationsAsString();
             out.fatal(CALL_INFO, -1, "%s, Error: Unable to find destination for address 0x%" PRIx64 ". Event: %s\nKnown Destinations: %s\n",
                     getName().c_str(), ev->getRoutingAddress(), ev->getVerboseString(dlevel).c_str(), availableDests.c_str());
         }
@@ -2557,9 +2777,9 @@ void DirectoryController::forwardByAddress(MemEventBase * ev, Cycle_t ts, bool d
  * dirAccess has default value of false
  */
 void DirectoryController::forwardByDestination(MemEventBase* ev, Cycle_t ts, bool dirAccess) {
-    if (cpuLink->isReachable(ev->getDst())) {
+    if (linkUp_->isReachable(ev->getDst())) {
         cpuMsgQueue.insert(std::make_pair(ts, ev));
-    } else if (memLink->isReachable(ev->getDst())) {
+    } else if (linkDown_->isReachable(ev->getDst())) {
         memMsgQueue.insert(std::make_pair(ts, MemMsg(ev, dirAccess)));
     } else {
         out.fatal(CALL_INFO, -1, "%s, Error: Destination %s appears unreachable on both links. Event: %s\n",

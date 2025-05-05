@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -145,7 +145,7 @@ class PhysMemManager {
 
         output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"PhysMemManager %s\n", filename.str().c_str());
 
-        fprintf(fp,"m_numAllocated %llu\n",m_numAllocated);
+        fprintf(fp,"m_numAllocated %" PRIu64 "\n",m_numAllocated);
         m_bitMap.checkpoint(fp);
     }
     void checkpointLoad( SST::Output* output , std::string dir ) {
@@ -154,8 +154,8 @@ class PhysMemManager {
         auto fp = fopen(filename.str().c_str(),"r");
         assert(fp);
 
-        assert( 1 == fscanf(fp,"m_numAllocated %llu\n",&m_numAllocated) );
-        output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"m_numAllocated %llu\n",m_numAllocated);
+        assert( 1 == fscanf(fp,"m_numAllocated %" SCNu64 "\n",&m_numAllocated) );
+        output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"m_numAllocated %" PRIu64 "\n",m_numAllocated);
         m_bitMap.checkpointLoad(output,fp);
     }
 

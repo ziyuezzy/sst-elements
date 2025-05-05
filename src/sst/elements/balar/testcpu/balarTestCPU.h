@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -29,15 +29,12 @@
 #include <sst/core/timeConverter.h>
 #include <sst/core/output.h>
 #include <sst/core/rng/marsaglia.h>
+#include "balar_packet.h"
 
-#include "host_defines.h"
 #include "builtin_types.h"
-#include "driver_types.h"
 #include "cuda.h"
 
 #include <sst/elements/memHierarchy/util.h>
-#include "util.h"
-#include <iostream>
 #include <fstream>
 #include <queue>
 

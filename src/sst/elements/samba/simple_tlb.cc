@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // This file is part of the SST software package. For license
@@ -96,12 +96,10 @@ SimpleTLB::SimpleTLB(SST::ComponentId_t id, SST::Params& params): Component(id) 
 
 	//mmu_to_cache = (SST::Link **) malloc( sizeof(SST::Link *) * core_count );
 
-    //event_link = configureSelfLink(link_buffer, "1ns", new Event::Handler<PageTableWalker>(TLB[i]->getPTW(), &PageTableWalker::handleEvent));
-
     // configure our link with a callback function that will be called whenever an event arrives
     // Callback function gets true for link_low
-    link_high = configureLink("high_network", new Event::Handler<SimpleTLB, bool>(this, &SimpleTLB::handleEvent, false));
-    link_low = configureLink("low_network", new Event::Handler<SimpleTLB, bool>(this, &SimpleTLB::handleEvent, true));
+    link_high = configureLink("high_network", new Event::Handler2<SimpleTLB,&SimpleTLB::handleEvent,bool>(this,false));
+    link_low = configureLink("low_network", new Event::Handler2<SimpleTLB,&SimpleTLB::handleEvent,bool>(this,true));
 
     // Failure usually means the user didn't connect the port in the input file
     sst_assert(link_low, CALL_INFO, -1, "Error in %s: Link configuration failed\n", getName().c_str());
@@ -112,7 +110,7 @@ SimpleTLB::SimpleTLB(SST::ComponentId_t id, SST::Params& params): Component(id) 
 
 
 	std::string cpu_clock = params.find<std::string>("clock", "1GHz");
-	registerClock( cpu_clock, new Clock::Handler<SimpleTLB>(this, &SimpleTLB::clockTick ) );
+	registerClock( cpu_clock, new Clock::Handler2<SimpleTLB,&SimpleTLB::clockTick>(this) );
 
 
 }

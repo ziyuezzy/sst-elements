@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -108,8 +108,8 @@ private:
     
     // TimeConverters - see timeConverter.h/.cc in sst-core
     // These store a clock interval and can be used to convert between time
-    TimeConverter* clock1converter;     // TimeConverter for clock1
-    TimeConverter* clock2converter;     // TimeConverter for clock2
+    TimeConverter clock1converter;     // TimeConverter for clock1
+    TimeConverter clock2converter;     // TimeConverter for clock2
     Clock::HandlerBase* clock2Handler; // Clock2 handler (clock2Tick)
 
 

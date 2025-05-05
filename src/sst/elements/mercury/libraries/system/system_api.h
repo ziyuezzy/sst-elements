@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -16,31 +16,15 @@
 
 #pragma once
 
-#include <sst/core/params.h>
-#include <sst/core/eli/elementinfo.h>
-#include <mercury/operating_system/libraries/api.h>
-
 namespace SST {
 namespace Hg {
 
-class systemAPI : public SST::Hg::API {
+class SystemAPI {
 
 public:
 
-  SST_ELI_REGISTER_DERIVED(
-    API,
-    systemAPI,
-    "hg",
-    "systemAPI",
-    SST_ELI_ELEMENT_VERSION(1,0,0),
-    "provides the Hg system API")
-
-systemAPI(SST::Params& params, App* app, SST::Component* comp);
-
-virtual ~systemAPI() { }
-
 /** Block and return the time when unblocked */
-double ssthg_block();
+virtual double ssthg_block() = 0;
 
 /**
  * @brief sleep SST virtual equivalent of Linux sleep

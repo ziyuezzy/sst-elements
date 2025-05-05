@@ -1,8 +1,8 @@
-// Copyright 2013-2024 NTESS. Under the terms
+// Copyright 2013-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2013-2024, NTESS
+// Copyright (c) 2013-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -75,13 +75,13 @@ LinkControl::LinkControl(ComponentId_t cid, Params &params, int vns) :
         port_name = params.find<std::string>("port_name");
     }
 
-    rtr_link = configureLink(port_name, std::string("1GHz"), new Event::Handler<LinkControl>(this,&LinkControl::handle_input));
+    rtr_link = configureLink(port_name, std::string("1GHz"), new Event::Handler2<LinkControl,&LinkControl::handle_input>(this));
 
     output_timing = configureSelfLink(port_name + "_output_timing", "1GHz",
-            new Event::Handler<LinkControl>(this,&LinkControl::handle_output));
+            new Event::Handler2<LinkControl,&LinkControl::handle_output>(this));
 
     congestion_timing = configureSelfLink(port_name = "_congestion_timing", getCoreTimeBase().toString(),
-            new Event::Handler<LinkControl>(this,&LinkControl::handle_congestion));
+            new Event::Handler2<LinkControl,&LinkControl::handle_congestion>(this));
 
     // Input and output buffers.  Not all of them can be set up now.
     // Only those that are sized based on req_vns can be intialized
@@ -229,7 +229,7 @@ void LinkControl::init(unsigned int phase)
 
         // Need to reset the time base of the output link
         UnitAlgebra link_clock = link_bw / flit_size_ua;
-        TimeConverter* tc = getTimeConverter(link_clock);
+        TimeConverter tc = getTimeConverter(link_clock);
         output_timing->setDefaultTimeBase(tc);
 
         // Initialize links
@@ -444,7 +444,11 @@ bool LinkControl::send(SimpleNetwork::Request* req, int vn) { //TODO: additional
     int flits = ev->getSizeInFlits();
 
     // Check to see if there are enough credits to send
-    if ( out_handle.credits < flits ) return false;
+    if ( out_handle.credits < flits ) {
+        ev->takeRequest();
+        delete ev;
+        return false;
+    }
 
     // Update the credits
     out_handle.credits -= flits;

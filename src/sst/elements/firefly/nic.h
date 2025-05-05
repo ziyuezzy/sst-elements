@@ -1,8 +1,8 @@
-// Copyright 2013-2024 NTESS. Under the terms
+// Copyright 2013-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2013-2024, NTESS
+// Copyright (c) 2013-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -17,7 +17,8 @@
 #ifndef COMPONENTS_FIREFLY_NIC_H
 #define COMPONENTS_FIREFLY_NIC_H
 
-#include <math.h>
+#include <cmath>
+#include <list>
 #include <sstream>
 #include <queue>
 #include <sst/core/module.h>
@@ -498,8 +499,8 @@ struct X {
     SST::Link*              m_selfLink;
 
     SST::Interfaces::SimpleNetwork*     m_linkControl;
-    SST::Interfaces::SimpleNetwork::Handler<Nic>* m_recvNotifyFunctor;
-    SST::Interfaces::SimpleNetwork::Handler<Nic>* m_sendNotifyFunctor;
+    SST::Interfaces::SimpleNetwork::HandlerBase* m_recvNotifyFunctor;
+    SST::Interfaces::SimpleNetwork::HandlerBase* m_sendNotifyFunctor;
     LinkControlWidget* m_linkRecvWidget;
     LinkControlWidget* m_linkSendWidget;
 

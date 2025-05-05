@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -60,19 +60,19 @@ public:
         register_offset = 0;
     }
 
-    VanadisPartialLoadInstruction* clone() { return new VanadisPartialLoadInstruction(*this); }
+    VanadisPartialLoadInstruction* clone() override { return new VanadisPartialLoadInstruction(*this); }
 
-    bool isPartialLoad() const { return true; }
+    bool isPartialLoad() const override { return true; }
 
-    virtual VanadisFunctionalUnitType getInstFuncType() const { return INST_LOAD; }
-    virtual const char*               getInstCode() const { return "PARTLOAD"; }
+    virtual VanadisFunctionalUnitType getInstFuncType() const override { return INST_LOAD; }
+    virtual const char*               getInstCode() const override { return "PARTLOAD"; }
 
     uint16_t getMemoryAddressRegister() const { return phys_int_regs_in[0]; }
     uint16_t getTargetRegister() const { return phys_int_regs_in[1]; }
 
     virtual void scalarExecute(SST::Output* output, VanadisRegisterFile* regFile) override { markExecuted(); }
 
-    virtual void printToBuffer(char* buffer, size_t buffer_size)
+    virtual void printToBuffer(char* buffer, size_t buffer_size) override
     {
         snprintf(
             buffer, buffer_size,
@@ -82,7 +82,7 @@ public:
             load_width);
     }
 
-    void computeLoadAddress(SST::Output* output, VanadisRegisterFile* regFile, uint64_t* out_addr, uint16_t* width)
+    void computeLoadAddress(SST::Output* output, VanadisRegisterFile* regFile, uint64_t* out_addr, uint16_t* width) override
     {
         const uint64_t mem_addr_reg_val = regFile->getIntReg<uint64_t>(phys_int_regs_in[0]);
         #ifdef VANADIS_BUILD_DEBUG
@@ -113,14 +113,14 @@ public:
         #endif
     }
 
-    uint16_t getLoadWidth() const { return load_width; }
+    uint16_t getLoadWidth() const override { return load_width; }
 
     VanadisLoadRegisterType getValueRegisterType() const { return LOAD_INT_REGISTER; }
 
-    uint16_t getRegisterOffset() const { return register_offset; }
+    uint16_t getRegisterOffset() const override { return register_offset; }
 
 protected:
-    void computeLoadAddress(VanadisRegisterFile* reg, uint64_t* out_addr, uint16_t* width)
+    void computeLoadAddress(VanadisRegisterFile* reg, uint64_t* out_addr, uint16_t* width) override
     {
         const uint64_t width_64 = (uint64_t)load_width;
 

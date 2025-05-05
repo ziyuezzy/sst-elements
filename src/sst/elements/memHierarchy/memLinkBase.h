@@ -1,8 +1,8 @@
-// Copyright 2013-2024 NTESS. Under the terms
+// Copyright 2013-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2013-2024, NTESS
+// Copyright (c) 2013-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -71,7 +71,17 @@ public:
             str << std::dec << " ID: " << id << " Region: " << region.toString();
             return str.str();
         }
+
+        void serialize_order(SST::Core::Serialization::serializer& ser) {
+            SST_SER(name);
+            SST_SER(addr);
+            SST_SER(id);
+            SST_SER(region);
+        }
     };
+
+    // Identifiers that can be attached to init messages to detect memory system topology
+    enum class ReachableGroup{Source, Dest, Peer, Unknown};
 
     /* Constructor */
     MemLinkBase(ComponentId_t id, Params &params, TimeConverter* tc) : SubComponent(id) {
@@ -87,7 +97,7 @@ public:
             DEBUG_ADDR.insert(*it);
         }
 
-        setDefaultTimeBase(tc);
+        setDefaultTimeBase(*tc);
 
         // Set up address region TODO deprecate in the next major release (SST 10)
         bool found, foundany;
@@ -100,8 +110,7 @@ public:
         string ilStep = params.find<std::string>("interleave_step", "0B", found);
         foundany |= found;
         if (foundany) {
-            dbg.output("%s, Warning: Region parameters given to link managers (addr_range_start/end, interleave_size/step) will be overwritten if the component sets them; specify region via component to eliminate this message\n",
-                    getName().c_str());
+            dbg.output("%s, Warning: The region parameters (addr_range_start, addr_range_end, interleave_size, interleave_step) are deprecated in MemLink and MemNIC. Give these parameters to the component instead to eliminate this message\n", getName().c_str());
         }
 
         // Ensure SI units are power-2 not power-10 - for backward compability
@@ -134,33 +143,21 @@ public:
     /* Initialization functions for parent */
     virtual void setRecvHandler(Event::HandlerBase * handler) { recvHandler = handler; }
     virtual bool isClocked() { return false; }
-    virtual void init(unsigned int UNUSED(phase)) { }
-    virtual void finish() { }
-    virtual void setup() { }
+    virtual void init(unsigned int UNUSED(phase)) override { }
+    virtual void complete(unsigned int UNUSED(phase)) override { }
+    virtual void finish() override { }
+    virtual void setup() override { }
 
     /* Debug - triggered by output.fatal() or SIGUSR2 */
-    virtual void printStatus(Output &out) {
+    virtual void printStatus(Output &out) override {
         out.output("  MemHierarchy::MemLinkBase: No status given\n");
     }
 
     virtual void emergencyShutdownDebug(Output &out) { }
 
     /* Send and receive functions for MemLink */
-    [[deprecated("sendInitData() has been deprecated and will be removed in SST 14.  Please use sendUntimedData().")]]
-    virtual void sendInitData(MemEventInit * ev, bool broadcast = true) =0;
-    virtual void sendUntimedData(MemEventInit * ev, bool broadcast = true) {
-        DISABLE_WARN_DEPRECATED_DECLARATION
-        sendInitData(ev,broadcast);
-        REENABLE_WARNING
-    }
-    [[deprecated("recvInitData() has been deprecated and will be removed in SST 14.  Please use recvUntimedData().")]]
-    virtual MemEventInit* recvInitData() =0;
-    virtual MemEventInit* recvUntimedData() {
-        DISABLE_WARN_DEPRECATED_DECLARATION
-        auto ret = recvInitData();
-        REENABLE_WARNING
-        return ret;
-    }
+    virtual void sendUntimedData(MemEventInit * ev, bool broadcast = true, bool lookup_dst = true) =0;
+    virtual MemEventInit* recvUntimedData() =0;
     virtual void send(MemEventBase * ev) =0;
 
     /*
@@ -174,20 +171,21 @@ public:
     /* Functions for managing communication according to address */
     virtual std::string findTargetDestination(Addr addr) =0;    /* Return destination and return "" if none found */
     virtual std::string getTargetDestination(Addr addr) =0;     /* Return destination and error if none found */
-    
+
     /* Check if a request address maps to our region */
     virtual bool isRequestAddressValid(Addr addr) { return info.region.contains(addr); }
-    
+
     /* Get a string-ized list of available destinations on this link */
     virtual std::string getAvailableDestinationsAsString() =0; // For debug
 
     /* Functions for managing source/destination information */
     virtual std::set<EndpointInfo>* getSources() =0;
     virtual std::set<EndpointInfo>* getDests() =0;
-
-    virtual bool isDest(std::string UNUSED(str)) =0;    /* Check whether a component is a destination on this link. May be slow (for init() only) */
-    virtual bool isSource(std::string UNUSED(str)) =0;  /* Check whether a component is a soruce on this link. May be slow (for init() only) */
-    virtual bool isReachable(std::string dst) =0;       /* Check whether a component is reachable on this link. Should be fast - used during simulation */
+    virtual std::set<EndpointInfo>* getPeers() =0; // If peers are reachable via this link, may be empty if no peers or not reachable
+    virtual bool isDest(std::string str) =0;       // Check whether a component is a destination on this link. May be slow (for init() only)
+    virtual bool isSource(std::string str) =0;     // Check whether a component is a source on this link. May be slow (for init() only)
+    virtual bool isPeer(std::string str) =0;       // Check whether a component is a peer on this link. May be slow (for init() only)
+    virtual bool isReachable(std::string dst) =0;  // Check whether a component is reachable on this link. Should be fast - used during simulation
 
     MemRegion getRegion() { return info.region; }
     void setRegion(MemRegion region) { info.region = region; }
@@ -196,10 +194,22 @@ public:
     void setEndpointInfo(EndpointInfo i) { info = i; }
 
     // Optional. This sets the name used for src/destination/requestor/etc.
-    // This should be set correctly by default but occasionally 
+    // This should be set correctly by default but occasionally
     // a specific implementation may require a different setting
     void setName(std::string name) { info.name = name; }
 
+    MemLinkBase() { }
+    virtual void serialize_order(SST::Core::Serialization::serializer& ser) override {
+        SST::SubComponent::serialize_order(ser);
+
+        SST_SER(dbg);
+        SST_SER(DEBUG_ADDR);
+        SST_SER(dlevel);
+        SST_SER(info);
+        SST_SER(recvHandler);
+        SST_SER(untimed_receive_queue_);
+    }
+    ImplementVirtualSerializable(SST::MemHierarchy::MemLinkBase)
 protected:
 
     // Debug stuff
@@ -214,7 +224,7 @@ protected:
     SST::Event::HandlerBase * recvHandler; // Event handler to call when an event is received
 
     // Data structures
-    std::queue<MemEventInit*> initReceiveQ;     // queue for messages received during init
+    std::queue<MemEventInit*> untimed_receive_queue_;     // queue for messages received during init/complete
 
 private:
 

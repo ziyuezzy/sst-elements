@@ -86,6 +86,7 @@ inst/vpartialload.h \
 inst/vpartialstore.h \
 inst/vpcaddi.h \
 inst/vregfmt.h \
+inst/vrocc.h \
 inst/vscmp.h \
 inst/vscmpi.h \
 inst/vsetreg.h \
@@ -186,6 +187,8 @@ os/callev/voscallread.h \
 os/callev/voscallreadlinkat.h \
 os/callev/voscallreadlink.h \
 os/callev/voscallreadv.h \
+os/callev/voscallschedyield.h \
+os/callev/voscallsetaffinity.h \
 os/callev/voscallsetrobustlist.h \
 os/callev/voscallsettidaddr.h \
 os/callev/voscallstatx.h \
@@ -212,6 +215,8 @@ os/syscall/fstatat.h \
 os/syscall/fstat.h \
 os/syscall/futex.cc \
 os/syscall/futex.h \
+os/syscall/getaffinity.h \
+os/syscall/getcpu.h \
 os/syscall/getpgid.h \
 os/syscall/getpid.h \
 os/syscall/getppid.h \
@@ -233,6 +238,8 @@ os/syscall/read.h \
 os/syscall/readlinkat.h \
 os/syscall/readlink.h \
 os/syscall/readv.h \
+os/syscall/schedyield.h \
+os/syscall/setaffinity.h \
 os/syscall/setrobustlist.h \
 os/syscall/settidaddress.h \
 os/syscall/statx.h \
@@ -246,7 +253,9 @@ os/syscall/write.h \
 os/syscall/writev.h \
 \
 os/resp/voscallresp.h \
-os/resp/vosexitresp.h
+os/resp/vosexitresp.h \
+rocc/vroccinterface.h \
+rocc/vbasicrocc.h
 
 
 EXTRA_DIST = \
@@ -557,14 +566,29 @@ EXTRA_DIST = \
 	tests/small/misc/hpcg/mipsel/hpcg \
 	tests/small/misc/hpcg/riscv64/hpcg \
 \
+	tests/small/rocc/basic-rocc/Makefile \
+	tests/small/rocc/basic-rocc/basic-rocc.c \
+	tests/small/rocc/basic-rocc/riscv64/basic-rocc \
+	tests/small/rocc/basic-rocc/riscv64/2rocc/sst.stdout.gold \
+	tests/small/rocc/basic-rocc/riscv64/2rocc/vanadis.stdout.gold \
+	tests/small/rocc/basic-rocc/riscv64/2rocc/vanadis.stderr.gold \
+\
 	tests/basic_vanadis.py \
 	tests/no_rtr_vanadis.py \
 	tests/testsuite_default_vanadis.py \
+	tests/rocc_vanadis.py \
 \
 	tests/riscv-tests/patch.txt \
 	tests/riscv-tests/README \
 	tests/riscv-tests/run-riscv-tests \
-	tests/riscv-tests/run-riscv-tests.out
+	tests/riscv-tests/run-riscv-tests.out \
+\
+	tests/small/multicore/openmp/Makefile \
+	tests/small/multicore/openmp/openmp.cpp \
+	tests/small/multicore/openmp/riscv64/openmp \
+	tests/small/multicore/openmp/riscv64/3core/sst.stdout.gold \
+	tests/small/multicore/openmp/riscv64/3core/vanadis.stdout.gold \
+	tests/small/multicore/openmp/riscv64/3core/vanadis.stderr.gold
 
 libvanadis_la_SOURCES = \
 	vanadis.cc \

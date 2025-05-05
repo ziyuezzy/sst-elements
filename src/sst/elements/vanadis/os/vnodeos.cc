@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -62,15 +62,16 @@ VanadisNodeOSComponent::VanadisNodeOSComponent(SST::ComponentId_t id, SST::Param
     } else {
         m_checkpoint = NO_CHECKPOINT;
     }
-    const uint32_t core_count = params.find<uint32_t>("cores", 0);
-    const uint32_t hardwareThreadCount = params.find<uint32_t>("hardwareThreadCount", 1);
+    m_coreCount = params.find<uint32_t>("cores", 0);
+    m_hardwareThreadCount = params.find<uint32_t>("hardwareThreadCount", 1);
+    m_numLogicalCores = m_coreCount * m_hardwareThreadCount;
     
-    if (core_count == 0) {
+    if (m_coreCount == 0) {
         output->fatal(CALL_INFO, -1, "Missing parameter (%s): 'cores' must be specified and at least 1.\n", getName().c_str());
     }
 
-    for ( int i = 0; i < core_count; i++ ) {
-        for ( int j = 0; j < hardwareThreadCount; j++ ) {
+    for ( int i = 0; i < m_coreCount; i++ ) {
+        for ( int j = 0; j < m_hardwareThreadCount; j++ ) {
             m_availHwThreads.push( new OS::HwThreadID( i,j ) );
         } 
     } 
@@ -114,7 +115,7 @@ VanadisNodeOSComponent::VanadisNodeOSComponent(SST::ComponentId_t id, SST::Param
 
     m_nodeNum = params.find<int>("node_id", -1);
 
-    m_coreInfoMap.resize( core_count, hardwareThreadCount ); 
+    m_coreInfoMap.resize( m_coreCount, m_hardwareThreadCount ); 
 
     int numProcess = 0;
 
@@ -141,7 +142,7 @@ if ( CHECKPOINT_LOAD != m_checkpoint ) {
             }
 
             unsigned tid = getNewTid();
-            m_threadMap[tid] = new OS::ProcessInfo( m_mmu, m_physMemMgr, m_nodeNum, tid, m_elfMap[exe], m_processDebugLevel, m_pageSize, tmp );
+            m_threadMap[tid] = new OS::ProcessInfo( m_mmu, m_physMemMgr, m_nodeNum, tid, m_elfMap[exe], m_processDebugLevel, m_pageSize, m_numLogicalCores, tmp );
             ++numProcess;
         } else {
           break;
@@ -165,23 +166,23 @@ if ( CHECKPOINT_LOAD != m_checkpoint ) {
     m_appRuntimeMemory = loadModule<AppRuntimeMemoryMod>(modName,notUsed);
 
     output->verbose(CALL_INFO, 1, VANADIS_OS_DBG_INIT, "Configuring the memory interface...\n");
-    mem_if = loadUserSubComponent<Interfaces::StandardMem>("mem_interface", ComponentInfo::SHARE_NONE,
-                                                         getTimeConverter("1ps"),
-                                                         new StandardMem::Handler<SST::Vanadis::VanadisNodeOSComponent>(
-                                                             this, &VanadisNodeOSComponent::handleIncomingMemory));
-    output->verbose(CALL_INFO, 1, VANADIS_OS_DBG_INIT, "Configuring for %" PRIu32 " core links...\n", core_count);
-    core_links.reserve(core_count);
+    mem_if = loadUserSubComponent<Interfaces::StandardMem>(
+        "mem_interface", ComponentInfo::SHARE_NONE,
+        getTimeConverter("1ps"),
+        new StandardMem::Handler2<SST::Vanadis::VanadisNodeOSComponent,&VanadisNodeOSComponent::handleIncomingMemoryCallback>(this));
+    output->verbose(CALL_INFO, 1, VANADIS_OS_DBG_INIT, "Configuring for %" PRIu32 " core links...\n", m_coreCount);
+    core_links.reserve(m_coreCount);
 
     char* port_name_buffer = new char[128];
 
 
-    for (uint32_t i = 0; i < core_count; ++i) {
+    for (uint32_t i = 0; i < m_coreCount; ++i) {
         snprintf(port_name_buffer, 128, "core%" PRIu32 "", i);
         output->verbose(CALL_INFO, 1, VANADIS_OS_DBG_INIT, "---> processing link %s...\n", port_name_buffer);
 
         SST::Link* core_link = configureLink(
             port_name_buffer, "0ns",
-            new Event::Handler<VanadisNodeOSComponent>(this, &VanadisNodeOSComponent::handleIncomingSyscall));
+            new Event::Handler2<VanadisNodeOSComponent,&VanadisNodeOSComponent::handleIncomingSyscallEvent>(this));
 
         if (nullptr == core_link) {
             output->fatal(CALL_INFO, -1, "Error: unable to configure link: %s\n", port_name_buffer);
@@ -194,6 +195,8 @@ if ( CHECKPOINT_LOAD != m_checkpoint ) {
     delete[] port_name_buffer;
 
     m_deviceList[-1000] = new OS::Device( "/dev/rdmaNic", 0x80000000, 1048576 );
+    // Add balar to vanadis device list
+    m_deviceList[-2000] = new OS::Device( "/dev/balar", 0x80100000, 1024 );
 
     registerAsPrimaryComponent();
     primaryComponentDoNotEndSim();
@@ -307,7 +310,7 @@ VanadisNodeOSComponent::checkpoint( std::string dir )
     fprintf(fp,"m_phdr_address: %#" PRIx64 "\n",m_phdr_address);
     fprintf(fp,"m_stack_top: %#" PRIx64 "\n",m_stack_top);
     fprintf(fp,"m_nodeNum: %d\n",m_nodeNum);
-    fprintf(fp,"m_osStartTimeNano: %llu\n",m_osStartTimeNano);
+    fprintf(fp,"m_osStartTimeNano: %" PRIu64 "\n",m_osStartTimeNano);
     fprintf(fp,"m_currentTid: %d\n",m_currentTid);
 
     assert( m_pendingFault.empty() );
@@ -357,7 +360,7 @@ int VanadisNodeOSComponent::checkpointLoad( std::string dir )
         assert( 3 == fscanf(fp,"thread: %d, pid: %d %s\n",&tid,&pid,str ) );
         output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"thread: %d, pid: %d %s\n",tid,pid, str);
         if ( tid == pid ) { 
-            m_threadMap[tid] = new OS::ProcessInfo( output, dir, m_mmu, m_physMemMgr, m_nodeNum, tid, m_elfMap[str], m_processDebugLevel, m_pageSize );
+            m_threadMap[tid] = new OS::ProcessInfo( output, dir, m_mmu, m_physMemMgr, m_nodeNum, tid, m_elfMap[str], m_processDebugLevel, m_pageSize, m_numLogicalCores);
             processMap[pid] = m_threadMap[tid];
         } else {
             m_threadMap[tid] = new OS::ProcessInfo;
@@ -456,16 +459,16 @@ int VanadisNodeOSComponent::checkpointLoad( std::string dir )
     output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"m_pageSize: %d\n",m_pageSize);
 
     assert( 1 == fscanf(fp,"m_phdr_address: %" PRIx64 "\n",&m_phdr_address) );
-    output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"m_phdr_address: %#llx\n",m_phdr_address);
+    output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"m_phdr_address: %#" PRIx64 "\n",m_phdr_address);
 
     assert( 1 == fscanf(fp,"m_stack_top: %" PRIx64 "\n",&m_stack_top) );
-    output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"m_stack_top: %#llx\n",m_stack_top);
+    output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"m_stack_top: %#" PRIx64 "\n",m_stack_top);
 
     assert( 1 == fscanf(fp,"m_nodeNum: %d\n",&m_nodeNum) );
     output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"m_nodeNum: %d\n",m_nodeNum);
 
-    assert( 1 == fscanf(fp,"m_osStartTimeNano: %llu\n",&m_osStartTimeNano) );
-    output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"m_osStartTimeNano: %llu\n",m_osStartTimeNano);
+    assert( 1 == fscanf(fp,"m_osStartTimeNano: %" PRIu64 "\n",&m_osStartTimeNano) );
+    output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"m_osStartTimeNano: %" PRIu64 "\n",m_osStartTimeNano);
 
     assert( 1 == fscanf(fp,"m_currentTid: %d\n",&m_currentTid) );
     output->verbose(CALL_INFO, 0, VANADIS_DBG_CHECKPOINT,"m_currentTid: %d\n",m_currentTid);
@@ -474,7 +477,7 @@ int VanadisNodeOSComponent::checkpointLoad( std::string dir )
     return m_threadMap.size();
 }
 
-void VanadisNodeOSComponent::handleIncomingMemory(StandardMem::Request* ev) {
+void VanadisNodeOSComponent::handleIncomingMemoryCallback(StandardMem::Request* ev) {
     auto lookup_result = m_memRespMap.find(ev->getID());
 
     if ( lookup_result == m_memRespMap.end() )  {
@@ -586,7 +589,7 @@ void VanadisNodeOSComponent::writeMem( OS::ProcessInfo* process, uint64_t virtAd
 }
 
 void
-VanadisNodeOSComponent::handleIncomingSyscall(SST::Event* ev) {
+VanadisNodeOSComponent::handleIncomingSyscallEvent(SST::Event* ev) {
     VanadisSyscallEvent* sys_ev = dynamic_cast<VanadisSyscallEvent*>(ev);
 
     if (nullptr == sys_ev) {
@@ -623,7 +626,7 @@ VanadisNodeOSComponent::handleIncomingSyscall(SST::Event* ev) {
                 m_flushPages.push_back( 0x28c0 );
 
                 for ( auto & x : m_flushPages ) {
-                    printf("%#llx\n",x);
+                    printf("%#" PRIx64 "\n",x);
                     StandardMem::Request* req = new SST::Interfaces::StandardMem::FlushAddr( x, 64, true, 5, 0 );
                     mem_if->send(req);
                 }

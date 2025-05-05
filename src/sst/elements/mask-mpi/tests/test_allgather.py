@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #
-# Copyright 2009-2024 NTESS. Under the terms
+# Copyright 2009-2025 NTESS. Under the terms
 # of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 #
-# Copyright (c) 2009-2024, NTESS
+# Copyright (c) 2009-2025, NTESS
 # All rights reserved.
 #
 # This file is part of the SST software package. For license
@@ -28,7 +28,10 @@ if __name__ == "__main__":
         "verbose" : "0",
         "app1.name" : "allgather",
         "app1.exe"  : "allgather.so",
-        "app1.apis" : ["systemAPI:libsystemapi.so", "SimTransport:libsumi.so", "MpiApi:libmask_mpi.so"],
+        "app1.libraries" : ["SystemLibrary:libsystemlibrary.so",
+                            "ComputeLibrary:libcomputelibrary.so",
+                            "SimTransport:libsumi.so",
+                            "MpiApi:libmask_mpi.so"],
     })
 
     topo = topoSingle()

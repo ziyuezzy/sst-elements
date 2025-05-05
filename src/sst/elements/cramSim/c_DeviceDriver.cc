@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -846,7 +846,7 @@ bool c_DeviceDriver::sendCommand(c_BankCommand* x_bankCommandPtr,
       }
 
         #ifdef __SST_DEBUG_OUTPUT__
-                debug->verbose(CALL_INFO,1,0,"Cycle:%lld Cmd:%s CH:%d PCH:%d Rank:%d BG:%d B:%d Row:%d Col:%d BankId:%d CmdSeq:%u\n",
+                debug->verbose(CALL_INFO,1,0,"Cycle:%" PRIu64 " Cmd:%s CH:%d PCH:%d Rank:%d BG:%d B:%d Row:%d Col:%d BankId:%d CmdSeq:%u\n",
                     m_simCycle,
                      x_bankCommandPtr->getCommandString().c_str(),
                      x_bankCommandPtr->getHashedAddress()->getChannel(),

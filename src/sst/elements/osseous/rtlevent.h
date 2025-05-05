@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -44,13 +44,13 @@ public:
 
     void serialize_order(SST::Core::Serialization::serializer &ser)  override {
         SST::Event::serialize_order(ser);
-        ser & update_inp;
-        ser & update_ctrl;
-        ser & update_registers;
-        ser & verbose;
-        ser & done_reset;
-        ser & update_eval_args;
-        ser & sim_done;
+        SST_SER(update_inp);
+        SST_SER(update_ctrl);
+        SST_SER(update_registers);
+        SST_SER(verbose);
+        SST_SER(done_reset);
+        SST_SER(update_eval_args);
+        SST_SER(sim_done);
     }
 
     ImplementSerializable(SST::RtlComponent::RTLEvent);

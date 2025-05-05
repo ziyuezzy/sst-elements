@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -14,7 +14,7 @@
 // distribution.
 
 
-#include <sst_config.h>
+#include <sst/core/sst_config.h>
 #include <sst/core/link.h>
 #include "sst/elements/memHierarchy/util.h"
 #include "membackend/MessierBackend.h"
@@ -32,7 +32,7 @@ using namespace SST::MemHierarchy;
 Messier::Messier(ComponentId_t id, Params &params) : SimpleMemBackend(id,params){ 
 	std::string access_time = "1ns"; //params.find<std::string>("access_time", "1 ns");
 	nvm_link = configureLink( "nvm_link", access_time,
-			new Event::Handler<Messier>(this, &Messier::handleMessierResp));
+			new Event::Handler2<Messier, &Messier::handleMessierResp>(this));
 
 //	using std::placeholders::_1;
 //	using std::placeholders::_2;

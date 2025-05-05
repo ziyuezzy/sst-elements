@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -22,7 +22,7 @@
 #include <mercury/operating_system/process/process_context.h>
 #include <mercury/operating_system/process/software_id.h>
 #include <mercury/operating_system/process/app_fwd.h>
-#include <mercury/operating_system/libraries/api.h>
+#include <mercury/operating_system/libraries/library.h>
 #include <mercury/operating_system/threading/threading_interface.h>
 
 #include <queue>
@@ -68,11 +68,11 @@ class Thread
 
   static Thread* current();
 
-  template <class T> T* getApi(const std::string& name) {
-    API* a = getAppApi(name);
+  template <class T> T* getLibrary(const std::string& name) {
+    Library* a = getAppLibrary(name);
     T* casted = dynamic_cast<T*>(a);
     if (!casted) {
-      sst_hg_abort_printf("Failed to cast API to correct type for %s: got %s",
+      sst_hg_abort_printf("Failed to cast Library to correct type for %s: got %s",
                         name.c_str(), typeid(a).name());
     }
     return casted;
@@ -168,12 +168,6 @@ class Thread
     return os_;
   }
 
-//  void collectStats(Timestamp start, TimeDelta elapsed);
-
-//  const int* backtrace() const {
-//    return backtrace_;
-//  }
-
   virtual bool isMainThread() const {
     return false;
   }
@@ -201,12 +195,6 @@ class Thread
   void incrementBlockCounter() {
     ++block_counter_;
   }
-
-//  void appendBacktrace(int fxnId);
-
-//  void popBacktrace();
-
-//  void recordLastBacktrace(int nfxn);
 
   void initThread(const SST::Params& params, int phyiscal_thread_id,
     ThreadContext* tocopy, void *stack, int stacksize,
@@ -278,48 +266,8 @@ class Thread
     return active_cores_.size();
   }
 
-  void computeDetailed(uint64_t flops, uint64_t intops,
-                        uint64_t bytes, int nthread=use_omp_num_threads);
-
-//  int ompGetThreadNum() const {
-//    auto& active = omp_contexts_.back();
-//    return active.id;
-//  }
-
-//  int ompGetNumThreads() const {
-//    auto& active = omp_contexts_.back();
-//    return active.num_threads;
-//  }
-
-//  int ompGetMaxThreads() const {
-//    auto& active = omp_contexts_.back();
-//    return active.max_num_subthreads;
-//  }
-
-//  int ompGetAncestorThreadNum() const {
-//    auto& active = omp_contexts_.back();
-//    return active.parent_id;
-//  }
-
-//  void ompSetNumThreads(int thr) {
-//    auto& active = omp_contexts_.back();
-//    active.requested_num_subthreads = thr;
-//  }
-
-//  int ompGetLevel() const {
-//    auto& active = omp_contexts_.back();
-//    return active.level;
-//  }
-
-//  int ompInParallel() {
-//    auto& active = omp_contexts_.back();
-//    bool parallel = active.level > 0;
-//    return parallel ? 1 : 0;
-//  }
-
-//  template <class T> static T* getCurrentApi(){
-//    return current()->getApi<T>();
-//  }
+  // void computeDetailed(uint64_t flops, uint64_t intops,
+  //                       uint64_t bytes, int nthread=use_omp_num_threads);
 
   void* getTlsValue(long thekey) const;
 
@@ -327,23 +275,9 @@ class Thread
 
   Timestamp now();
 
-  void startAPICall();
+  void startLibraryCall();
 
-  void endAPICall();
-
-//  void setTag(const FTQTag& t){
-//    ftag_ = t;
-//  }
-
-//  const FTQTag& tag() const {
-//    return ftag_;
-//  }
-
-//  void spawnOmpParallel();
-
-//  CallGraph* callGraph() const {
-//    return callGraph_;
-//  }
+  void endLibraryCall();
 
  protected:
   Thread(SST::Params& params,
@@ -389,16 +323,12 @@ class Thread
 
   ProcessContext p_txt_;
 
-//  FTQTag ftag_;
-
   SoftwareId sid_;
 
 //  HostTimer* host_timer_;
 
  private:
-  API* getAppApi(const std::string& name) const;
-
-//  CallGraphTrace backtrace_; //each function is labeled by unique integer
+  SST::Hg::Library* getAppLibrary(const std::string& name) const;
 
   int last_bt_collect_nfxn_;
 
@@ -429,11 +359,6 @@ class Thread
   detach_t detach_state_;
 
   std::list<omp_context> omp_contexts_;
-
-//  CallGraph* callGraph_;
-
-//  FTQCalendar* ftq_trace_;
-
 };
 
 } // end namespace Hg

@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -16,13 +16,10 @@
 #include <mercury/common/errors.h>
 #include <mercury/components/operating_system.h>
 #include <mercury/operating_system/process/thread_info.h>
+#include <mercury/operating_system/process/app.h>
 #include <mercury/operating_system/process/tls.h>
 #include <mercury/operating_system/threading/thread_lock.h>
 #include <mercury/operating_system/threading/stack_alloc.h>
-//#include <process/global.h>
-//#include <mercury/common/sstmac_config.h>
-//#include <sprockit/thread_safe_new.h>
-//#include <sstmac/skeleton_tls.h>
 
 #include <iostream>
 #include <string.h>
@@ -107,23 +104,31 @@ ThreadInfo::registerUserSpaceVirtualThread(int phys_thread_id, void *stack,
 //  void** currentGlobalsPtr = (void**) &fake_globals[0];
 //  void** currentTlsPtr = (void**) &fake_tls[0];
 
-//  globals_lock.lock();
-//  if (globalsMap && isAppStartup){
-//    void* currentGlobals = *currentGlobalsPtr;
-//    *currentGlobalsPtr = globalsMap;
-//    GlobalVariable::glblCtx.addActiveSegment(globalsMap);
-//    GlobalVariable::glblCtx.callInitFxns(globalsMap);
-//    *currentGlobalsPtr = currentGlobals;
-//  }
+  int activeStack; int* activeStackPtr = &activeStack;
+  intptr_t stackTopInt = sst_hg_global_stacksize //avoid errors if this is zero
+      ? ((intptr_t)activeStackPtr/sst_hg_global_stacksize)*sst_hg_global_stacksize
+      : 0;
 
-//  if (tlsMap && isThreadStartup){
-//    void* currentTls = *currentTlsPtr;
-//    *currentTlsPtr = tlsMap;
-//    GlobalVariable::tlsCtx.addActiveSegment(tlsMap);
-//    GlobalVariable::tlsCtx.callInitFxns(tlsMap);
-//    *currentTlsPtr = currentTls;
-//  }
-//  globals_lock.unlock();
+  void** currentGlobalsPtr = (void**)(stackTopInt + SST_HG_TLS_GLOBAL_MAP);
+  void** currentTlsPtr = (void**)(stackTopInt + SST_HG_TLS_GLOBAL_MAP);
+
+ globals_lock.lock();
+ if (globalsMap && isAppStartup){
+   void* currentGlobals = *currentGlobalsPtr;
+   *currentGlobalsPtr = globalsMap;
+   GlobalVariable::glblCtx.addActiveSegment(globalsMap);
+   GlobalVariable::glblCtx.callInitFxns(globalsMap);
+   *currentGlobalsPtr = currentGlobals;
+ }
+
+ if (tlsMap && isThreadStartup){
+   void* currentTls = *currentTlsPtr;
+   *currentTlsPtr = tlsMap;
+   GlobalVariable::tlsCtx.addActiveSegment(tlsMap);
+   GlobalVariable::tlsCtx.callInitFxns(tlsMap);
+   *currentTlsPtr = currentTls;
+ }
+ globals_lock.unlock();
 }
 
 void

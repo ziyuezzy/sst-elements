@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -12,6 +12,9 @@
 // This file is part of the SST software package. For license
 // information, see the LICENSE file in the top level directory of the
 // distribution.
+
+// There's a reasonable chance that we'll want the globals/TLS support eventually,
+// so I'm leaving that sst-macro code here for now -- JPK
 
 #pragma once
 
@@ -60,7 +63,7 @@ extern "C" {
 #undef char32_t
 #endif
 
-//#include <sstmac/software/process/cppglobal.h>
+#include <mercury/operating_system/process/cppglobal.h>
 #include <new>
 #include <utility>
 
@@ -161,7 +164,7 @@ class Params;
 #endif
 
 //#include <sstmac/software/process/global.h>
-#include <mercury/operating_system/libraries/api_fwd.h>
+#include <mercury/operating_system/libraries/library_fwd.h>
 /* end C++ */
 #else
 /* need for C */
@@ -199,17 +202,17 @@ extern "C" {
 #endif
 
 extern int ssthg_global_stacksize;
-//extern char* static_init_glbls_segment;
-//extern char* static_init_tls_segment;
-//void sst_hg_init_global_space(void* ptr, int size, int offset, bool tls);
-//void sst_hg_advance_time(const char* param_name);
+extern char* static_init_glbls_segment;
+extern char* static_init_tls_segment;
+void sst_hg_init_global_space(void* ptr, int size, int offset, bool tls);
+void sst_hg_advance_time(const char* param_name);
 void sst_hg_blocking_call(int condition, double timeout, const char* api);
 
 #ifdef __cplusplus
 }
 #endif
 
-//#include <sstmac/skeleton_tls.h>
+#include <mercury/common/skeleton_tls.h>
 #include <mercury/common/null_buffer.h>
 
 

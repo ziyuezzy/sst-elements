@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -18,6 +18,7 @@
 
 #include "inst/vinstall.h"
 #include "velf/velfinfo.h"
+#include "decoder/vriscv64decoder.h"
 
 #include "os/resp/vosexitresp.h"
 
@@ -74,7 +75,7 @@ VANADIS_COMPONENT::VANADIS_COMPONENT(SST::ComponentId_t id, SST::Params& params)
 
     std::string clock_rate = params.find<std::string>("clock", "1GHz");
     output->verbose(CALL_INFO, 2, 0, "Registering clock at %s.\n", clock_rate.c_str());
-    cpuClockHandler = new Clock::Handler<VANADIS_COMPONENT>(this, &VANADIS_COMPONENT::tick);
+    cpuClockHandler = new Clock::Handler2<VANADIS_COMPONENT,&VANADIS_COMPONENT::tick>(this);
     cpuClockTC      = registerClock(clock_rate, cpuClockHandler);
 
     const uint32_t rob_count = params.find<uint32_t>("reorder_slots", 64);
@@ -112,7 +113,7 @@ VANADIS_COMPONENT::VANADIS_COMPONENT(SST::ComponentId_t id, SST::Params& params)
 
     halted_masks = new bool[hw_threads];
 
-    os_link = configureLink("os_link", "0ns", new Event::Handler<VANADIS_COMPONENT>(this, &VANADIS_COMPONENT::recvOSEvent));
+    os_link = configureLink("os_link", "0ns", new Event::Handler2<VANADIS_COMPONENT,&VANADIS_COMPONENT::recvOSEvent>(this));
     if ( nullptr == os_link ) {
         output->fatal(CALL_INFO, -1, "Error: was unable to configureLink %s \n", "os_link");
     }
@@ -232,12 +233,10 @@ VANADIS_COMPONENT::VANADIS_COMPONENT(SST::ComponentId_t id, SST::Params& params)
     //	memDataInterface =
     // loadUserSubComponent<Interfaces::SimpleMem>("mem_interface_data",
     // ComponentInfo::SHARE_NONE, cpuClockTC, 		new
-    // SimpleMem::Handler<SST::Vanadis::VanadisComponent>(this,
     //&VanadisComponent::handleIncomingDataCacheEvent ));
     memInstInterface = loadUserSubComponent<Interfaces::StandardMem>(
-        "mem_interface_inst", ComponentInfo::SHARE_NONE, cpuClockTC,
-        new StandardMem::Handler<SST::Vanadis::VANADIS_COMPONENT>(
-            this, &VANADIS_COMPONENT::handleIncomingInstCacheEvent));
+        "mem_interface_inst", ComponentInfo::SHARE_NONE, &cpuClockTC,
+        new StandardMem::Handler2<SST::Vanadis::VANADIS_COMPONENT,&VANADIS_COMPONENT::handleIncomingInstCacheEvent>(this));
 
     if ( nullptr == memInstInterface ) {
         output->fatal(
@@ -261,6 +260,16 @@ VANADIS_COMPONENT::VANADIS_COMPONENT(SST::ComponentId_t id, SST::Params& params)
     lsq->setRegisterFiles(&register_files);
 
     //////////////////////////////////////////////////////////////////////////////////////
+    SubComponentSlotInfo * lists = getSubComponentSlotInfo("rocc");
+    if (lists) {
+        for (int i = 0; i <= lists->getMaxPopulatedSlotNumber(); i++) {
+            if (lists->isPopulated(i)) {
+                roccs_.push_back(lists->create<SST::Vanadis::VanadisRoCCInterface>(i, ComponentInfo::SHARE_NONE));
+                rocc_queues_.push_back(std::deque<VanadisInstruction*>());
+                output->verbose(CALL_INFO, 1, 0, "Successfully loaded RoCC Interface");
+            }
+        }
+    } 
 
     uint16_t fu_id = 0;
 
@@ -381,6 +390,10 @@ VANADIS_COMPONENT::~VANADIS_COMPONENT()
 {
     delete[] instPrintBuffer;
     delete lsq;
+
+    for ( int i= 0; i < roccs_.size(); i++) {
+        delete roccs_[i];
+    }
 
     for ( int i= 0; i < rob.size(); i++ ) {
         delete rob[i];
@@ -561,8 +574,8 @@ VANADIS_COMPONENT::performIssue(const uint64_t cycle, int hwThr, uint32_t& rob_s
                 if ( 0 == resource_check ) 
                 {
                     int allocate_fu = 1;
-
-                    if( (ins_type == INST_LOAD || ins_type == INST_STORE || ins_type == INST_FENCE) ) 
+                    if (ins_type == INST_LOAD || ins_type == INST_STORE || ins_type == INST_FENCE || 
+                        ins_type == INST_ROCC0 || ins_type == INST_ROCC1 || ins_type == INST_ROCC2 || ins_type == INST_ROCC3) 
                     {
                         if(unallocated_memory_op_seen) {
                             // the instruction should not be allocated because memory operations
@@ -751,6 +764,19 @@ VANADIS_COMPONENT::performExecute(const uint64_t cycle)
 
     // Tick the load/store queue
     lsq->tick((uint64_t)cycle);
+
+    // Tick the RoCC Interfaces
+    for (int i = 0; i < roccs_.size(); i++) {
+        RoCCResponse* resp;
+        if (!(roccs_[i]->isBusy()) && (resp = roccs_[i]->respond())) {
+            VanadisInstruction* ins = rocc_queues_[i].front();
+            register_files[ins->getHWThread()]->setIntReg<uint64_t>(resp->rd, resp->rd_val);
+            ins->markExecuted();
+            rocc_queues_[i].pop_front();
+        }
+        roccs_[i]->tick((uint64_t)cycle);
+
+    }
 
     return 0;
 }
@@ -1205,6 +1231,28 @@ VANADIS_COMPONENT::allocateFunctionalUnit(VanadisInstruction* ins)
     case INST_INT_ARITH:
         allocated_fu = mapInstructiontoFunctionalUnit(ins, fu_int_arith);
         break;
+
+    case INST_ROCC0:
+    case INST_ROCC1:
+    case INST_ROCC2:
+    case INST_ROCC3: {
+        int rocc_index = ins->getInstFuncType() - INST_ROCC0;
+
+        if (rocc_index > roccs_.size() - 1) {
+            output->fatal(
+                CALL_INFO, -1,
+                "Error: Attempted to allocate rocc%d instruction (ins-addr: 0x%" PRI_ADDR ") but rocc%d interface is not loaded\n", 
+                rocc_index, ins->getInstructionAddress(), rocc_index);
+        }
+
+        output->verbose(CALL_INFO, 16, 0, "allocating rocc%d instruction\n", rocc_index);
+        if (!roccs_[rocc_index]->RoCCFull()) {
+            output->verbose(CALL_INFO, 16, 0, "pushing to RoCC%d queue\n", rocc_index);
+            rocc_queues_[rocc_index].push_back(ins);
+            allocated_fu = true;
+        }
+        break;
+    }
 
     case INST_LOAD:
         if ( !lsq->loadFull() ) {
@@ -1782,6 +1830,34 @@ VANADIS_COMPONENT::assignRegistersToInstruction(
         }
     }
 
+
+    if (ins->getInstFuncType() >= INST_ROCC0 && ins->getInstFuncType() <= INST_ROCC3) {
+        int rocc_index = ins->getInstFuncType() - INST_ROCC0;
+        output->verbose(CALL_INFO, 16, 0, "issuing rocc%d instruction\n", rocc_index);
+
+        if (rocc_index > roccs_.size() - 1) {
+            output->fatal(
+                CALL_INFO, -1,
+                "Error: rocc%d instruction (ins-addr: 0x%" PRI_ADDR ") attempted to issue but rocc%d interface is not loaded\n", 
+                rocc_index, ins->getInstructionAddress(), rocc_index);
+        }
+
+        if (!roccs_[rocc_index]->RoCCFull()) {
+            VanadisRegisterFile* regFile = register_files[ins->getHWThread()];
+            regFile->print(output);
+
+            uint64_t rs1_val = regFile->getIntReg<int64_t>(ins->getPhysIntRegIn(0));
+            uint64_t rs2_val = regFile->getIntReg<int64_t>(ins->getPhysIntRegIn(1));
+
+            VanadisRoCCInstruction* vrocc_inst = static_cast<VanadisRoCCInstruction*>(ins);
+            RoCCInstruction* rocc_inst = new RoCCInstruction(
+                vrocc_inst->func7, vrocc_inst->rd, vrocc_inst->xs1, vrocc_inst->xs2, vrocc_inst->xd
+            );
+
+            roccs_[rocc_index]->push(new RoCCCommand(rocc_inst, rs1_val, rs2_val));
+        }
+    }
+
     return 0;
 }
 
@@ -1965,8 +2041,11 @@ VANADIS_COMPONENT::init(unsigned int phase)
     //	memDataInterface->init( phase );
     memInstInterface->init(phase);
 
-    while (SST::Event* ev = os_link->recvUntimedData()) {
+    for (int i = 0; i < roccs_.size(); i++) {
+        roccs_[i]->init(phase);
+    }
 
+    while (SST::Event* ev = os_link->recvUntimedData()) {
         assert( 0 );
     }
 
@@ -2285,8 +2364,8 @@ VANADIS_COMPONENT::checkpoint(FILE* fp )
         fprintf(fp,"Hardware thread: %d\n",i);
         if ( m_checkpointing[i] ) {
             fprintf(fp,"active: yes\n");
-            fprintf(fp,"rob[0] %#llx %s\n", rob[i]->peekAt(0)->getInstructionAddress(), rob[i]->peekAt(0)->getInstCode()  );
-            fprintf(fp,"rob[1] %#llx %s\n", rob[i]->peekAt(1)->getInstructionAddress(), rob[i]->peekAt(1)->getInstCode() );
+            fprintf(fp,"rob[0] %#" PRIx64 " %s\n", rob[i]->peekAt(0)->getInstructionAddress(), rob[i]->peekAt(0)->getInstCode()  );
+            fprintf(fp,"rob[1] %#" PRIx64 " %s\n", rob[i]->peekAt(1)->getInstructionAddress(), rob[i]->peekAt(1)->getInstCode() );
 
             auto isa_table = retire_isa_tables[i];
             auto reg_file = register_files[i];

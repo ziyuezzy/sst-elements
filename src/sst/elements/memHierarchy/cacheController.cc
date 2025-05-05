@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -13,7 +13,7 @@
 // information, see the LICENSE file in the top level directory of the
 // distribution.
 
-#include <sst_config.h>
+#include <sst/core/sst_config.h>
 #include <sst/core/params.h>
 #include <sst/core/interfaces/stringEvent.h>
 #include <sst/core/timeLord.h>
@@ -26,6 +26,8 @@
 
 using namespace SST;
 using namespace SST::MemHierarchy;
+
+/* Debug macros included from util.h */
 
 /**************************************************************************
  * Handlers for various links
@@ -50,13 +52,15 @@ void Cache::handleEvent(SST::Event * ev) {
     } else {
         statCacheRecv[(int)event->getCmd()]->addData(1);
     }
-    if (is_debug_event((event))) {
+    if (mem_h_is_debug_event((event))) {
         dbg_->debug(_L3_, "E: %-20" PRIu64 " %-20" PRIu64 " %-20s Event:Recv    (%s)\n",
                 getCurrentSimCycle(), timestamp_, getName().c_str(), event->getVerboseString().c_str());
         fflush(stdout);
     }
     
     eventBuffer_.push_back(event);
+    //printf("DBG: %s, inserted <%" PRIu64 ", %d>, size=%zu\n", getName().c_str(), event->getID().first, event->getID().second, eventBuffer_.size()); 
+
 }
 
 /* 
@@ -128,7 +132,7 @@ bool Cache::clockTick(Cycle_t time) {
     while (it != retryBuffer_.end()) {
         if (accepted == maxRequestsPerCycle_)
             break;
-        if (is_debug_event((*it))) {
+        if (mem_h_is_debug_event((*it))) {
             dbg_->debug(_L3_, "E: %-20" PRIu64 " %-20" PRIu64 " %-20s Event:Retry   (%s)\n",
                     getCurrentSimCycle(), timestamp_, getName().c_str(), (*it)->getVerboseString().c_str());
             fflush(stdout);
@@ -150,8 +154,9 @@ bool Cache::clockTick(Cycle_t time) {
     while (it != eventBuffer_.end()) {
         if (accepted == maxRequestsPerCycle_)
             break;
+        Event::id_type id = (*it)->getID();
         Command cmd = (*it)->getCmd();
-        if (is_debug_event((*it))) {
+        if (mem_h_is_debug_event((*it))) {
             dbg_->debug(_L3_, "E: %-20" PRIu64 " %-20" PRIu64 " %-20s Event:New     (%s)\n",
                     getCurrentSimCycle(), timestamp_, getName().c_str(), (*it)->getVerboseString().c_str());
             fflush(stdout);
@@ -160,12 +165,14 @@ bool Cache::clockTick(Cycle_t time) {
             accepted++;
             statRecvEvents->addData(1);
             it = eventBuffer_.erase(it);
+            //printf("DBG: %s, erased <%" PRIu64 ", %d>, it=%d, size=%zu\n", getName().c_str(), id.first, id.second, it == eventBuffer_.end(), eventBuffer_.size()); 
         } else {
             it++;
+            //printf("DBG: %s, left <%" PRIu64 ", %d>, it=%d, size=%zu\n", getName().c_str(), id.first, id.second, it == eventBuffer_.end(), eventBuffer_.size()); 
         }
     }
     while (!prefetchBuffer_.empty()) {
-        if (is_debug_event(prefetchBuffer_.front())) {
+        if (mem_h_is_debug_event(prefetchBuffer_.front())) {
             dbg_->debug(_L3_, "E: %-20" PRIu64 " %-20" PRIu64 " %-20s Event:Pref    (%s)\n",
                     getCurrentSimCycle(), timestamp_, getName().c_str(), prefetchBuffer_.front()->getVerboseString().c_str());
             fflush(stdout);
@@ -230,7 +237,7 @@ void Cache::turnClockOff() {
  *
  *   Returns: whether event was accepted/can be popped off event queue
  */
-bool Cache::processEvent(MemEventBase* ev, bool inMSHR) {
+bool Cache::processEvent(MemEventBase* ev, bool retry) {
     // Global noncacheable request flag
     if (allNoncacheableRequests_) {
         ev->setFlag(MemEvent::F_NONCACHEABLE);
@@ -248,7 +255,7 @@ bool Cache::processEvent(MemEventBase* ev, bool inMSHR) {
 
     /* Arbitrate cache access - bank/link. Reject request on failure */
     if (!arbitrateAccess(addr)) { // Disallow multiple requests to same line and/or bank in a single cycle
-        if (is_debug_addr(addr)) {
+        if (mem_h_is_debug_addr(addr)) {
             std::stringstream id;
             id << "<" << event->getID().first << "," << event->getID().second << ">";
             dbg_->debug(_L5_, "A: %-20" PRIu64 " %-20" PRIu64 " %-20s %-13s 0x%-16" PRIx64 " %-15s %-6s %-6s %-10s %-15s\n",
@@ -258,84 +265,99 @@ bool Cache::processEvent(MemEventBase* ev, bool inMSHR) {
         return false;
     }
 
-    bool dbgevent = is_debug_event(event);
+    bool dbgevent = mem_h_is_debug_event(event);
     bool accepted = false;
 
     switch (event->getCmd()) {
         case Command::GetS:
-            accepted = coherenceMgr_->handleGetS(event, inMSHR);
+            accepted = coherenceMgr_->handleGetS(event, retry);
             break;
         case Command::GetX:
-            accepted = coherenceMgr_->handleGetX(event, inMSHR);
+            accepted = coherenceMgr_->handleGetX(event, retry);
             break;
         case Command::Write:
-            accepted = coherenceMgr_->handleWrite(event, inMSHR);
+            accepted = coherenceMgr_->handleWrite(event, retry);
             break;
         case Command::GetSX:
-            accepted = coherenceMgr_->handleGetSX(event, inMSHR);
+            accepted = coherenceMgr_->handleGetSX(event, retry);
             break;
         case Command::FlushLine:
-            accepted = coherenceMgr_->handleFlushLine(event, inMSHR);
+            accepted = coherenceMgr_->handleFlushLine(event, retry);
             break;
         case Command::FlushLineInv:
-            accepted = coherenceMgr_->handleFlushLineInv(event, inMSHR);
+            accepted = coherenceMgr_->handleFlushLineInv(event, retry);
+            break;
+        case Command::FlushAll:
+            accepted = coherenceMgr_->handleFlushAll(event, retry);
             break;
         case Command::GetSResp:
-            accepted = coherenceMgr_->handleGetSResp(event, inMSHR);
+            accepted = coherenceMgr_->handleGetSResp(event, retry);
             break;
         case Command::WriteResp:
-            accepted = coherenceMgr_->handleWriteResp(event, inMSHR);
+            accepted = coherenceMgr_->handleWriteResp(event, retry);
             break;
         case Command::GetXResp:
-            accepted = coherenceMgr_->handleGetXResp(event, inMSHR);
+            accepted = coherenceMgr_->handleGetXResp(event, retry);
             break;
         case Command::FlushLineResp:
-            accepted = coherenceMgr_->handleFlushLineResp(event, inMSHR);
+            accepted = coherenceMgr_->handleFlushLineResp(event, retry);
+            break;
+        case Command::FlushAllResp:
+            accepted = coherenceMgr_->handleFlushAllResp(event, retry);
             break;
         case Command::PutS:
-            accepted = coherenceMgr_->handlePutS(event, inMSHR);
+            accepted = coherenceMgr_->handlePutS(event, retry);
             break;
         case Command::PutX:
-            accepted = coherenceMgr_->handlePutX(event, inMSHR);
+            accepted = coherenceMgr_->handlePutX(event, retry);
             break;
         case Command::PutE:
-            accepted = coherenceMgr_->handlePutE(event, inMSHR);
+            accepted = coherenceMgr_->handlePutE(event, retry);
             break;
         case Command::PutM:
-            accepted = coherenceMgr_->handlePutM(event, inMSHR);
+            accepted = coherenceMgr_->handlePutM(event, retry);
             break;
         case Command::FetchInv:
-            accepted = coherenceMgr_->handleFetchInv(event, inMSHR);
+            accepted = coherenceMgr_->handleFetchInv(event, retry);
             break;
         case Command::FetchInvX:
-            accepted = coherenceMgr_->handleFetchInvX(event, inMSHR);
+            accepted = coherenceMgr_->handleFetchInvX(event, retry);
             break;
         case Command::ForceInv:
-            accepted = coherenceMgr_->handleForceInv(event, inMSHR);
+            accepted = coherenceMgr_->handleForceInv(event, retry);
             break;
         case Command::Inv:
-            accepted = coherenceMgr_->handleInv(event, inMSHR);
+            accepted = coherenceMgr_->handleInv(event, retry);
             break;
         case Command::Fetch:
-            accepted = coherenceMgr_->handleFetch(event, inMSHR);
+            accepted = coherenceMgr_->handleFetch(event, retry);
             break;
         case Command::FetchResp:
-            accepted = coherenceMgr_->handleFetchResp(event, inMSHR);
+            accepted = coherenceMgr_->handleFetchResp(event, retry);
             break;
         case Command::FetchXResp:
-            accepted = coherenceMgr_->handleFetchXResp(event, inMSHR);
+            accepted = coherenceMgr_->handleFetchXResp(event, retry);
             break;
         case Command::AckInv:
-            accepted = coherenceMgr_->handleAckInv(event, inMSHR);
+            accepted = coherenceMgr_->handleAckInv(event, retry);
             break;
         case Command::AckPut:
-            accepted = coherenceMgr_->handleAckPut(event, inMSHR);
+            accepted = coherenceMgr_->handleAckPut(event, retry);
+            break;
+        case Command::ForwardFlush:
+            accepted = coherenceMgr_->handleForwardFlush(event, retry);
+            break;
+        case Command::AckFlush:
+            accepted = coherenceMgr_->handleAckFlush(event, retry);
+            break;
+        case Command::UnblockFlush:
+            accepted = coherenceMgr_->handleUnblockFlush(event, retry);
             break;
         case Command::NACK:
-            accepted = coherenceMgr_->handleNACK(event, inMSHR);
+            accepted = coherenceMgr_->handleNACK(event, retry);
             break;
         case Command::NULLCMD:
-            accepted = coherenceMgr_->handleNULLCMD(event, inMSHR);
+            accepted = coherenceMgr_->handleNULLCMD(event, retry);
             break;
         default:
             out_->fatal(CALL_INFO, -1, "%s, Error: Received an unsupported command. Event: %s. Time = %" PRIu64 "ns.\n",
@@ -446,20 +468,34 @@ void Cache::init(unsigned int phase) {
             linkDown_->sendUntimedData(coherenceMgr_->getInitCoherenceEvent());
 
         while(MemEventInit *event = linkDown_->recvUntimedData()) {
-            if (event->getCmd() == Command::NULLCMD) {
-                dbg_->debug(_L10_, "I: %-20s   Event:Init      (%s)\n",
+            if (event->getCmd() == Command::NULLCMD  || ( mem_h_is_debug_event(event) && event->getInitCmd() == MemEventInit::InitCommand::Data)) {
+                dbg_->debug(_L10_, "U: %-20s   Event:Untimed   (%s)\n",
                         getName().c_str(), event->getVerboseString().c_str());
             }
+
             /* If event is from one of our destinations, update parameters - link only returns events from destinations */
             if (event->getInitCmd() == MemEventInit::InitCommand::Coherence) {
                 MemEventInitCoherence * eventC = static_cast<MemEventInitCoherence*>(event);
                 processInitCoherenceEvent(eventC, linkDown_->isSource(eventC->getSrc()));
+                delete event;
             } else if (event->getInitCmd() == MemEventInit::InitCommand::Endpoint) {
-                MemEventInit * mEv = event->clone();
-                mEv->setSrc(getName());
-                linkDown_->sendUntimedData(mEv);
+                event->setSrc(getName());
+                linkDown_->sendUntimedData(event);
+            } else if (event->getInitCmd() == MemEventInit::InitCommand::Data) {
+                if (BasicCommandClassArr[(int)event->getCmd()] == BasicCommandClass::Request) {
+                    // Forward by addr (mmio likely)
+                    if (event->getCmd() == Command::GetS) 
+                        init_requests_.insert(std::make_pair(event->getID(), event->getSrc()));
+                    event->setSrc(getName());
+                    linkDown_->sendUntimedData(event, false, true);
+                } else {
+                    // Forward directly via lookup
+                    event->setSrc(getName());
+                    event->setDst(init_requests_.find(event->getID())->second);
+                    init_requests_.erase(event->getID());
+                    linkDown_->sendUntimedData(event, false, false);
+                }
             }
-            delete event;
         }
         return;
     }
@@ -473,44 +509,72 @@ void Cache::init(unsigned int phase) {
         linkDown_->sendUntimedData(coherenceMgr_->getInitCoherenceEvent());
     }
 
-    while (MemEventInit * memEvent = linkUp_->recvUntimedData()) {
-        if (memEvent->getCmd() == Command::NULLCMD) {
-            dbg_->debug(_L10_, "I: %-20s   Event:Init      (%s)\n",
-                    getName().c_str(), memEvent->getVerboseString().c_str());
-            if (memEvent->getInitCmd() == MemEventInit::InitCommand::Coherence) {
-                coherenceMgr_->hasUpperLevelCacheName(memEvent->getSrc());
-                MemEventInitCoherence * eventC = static_cast<MemEventInitCoherence*>(memEvent);
+    while (MemEventInit * event = linkUp_->recvUntimedData()) {
+        if (event->getCmd() == Command::NULLCMD) {
+            dbg_->debug(_L10_, "U: %-20s   Event:Untimed   (%s)\n",
+                    getName().c_str(), event->getVerboseString().c_str());
+            if (event->getInitCmd() == MemEventInit::InitCommand::Coherence) {
+                coherenceMgr_->hasUpperLevelCacheName(event->getSrc());
+                MemEventInitCoherence * eventC = static_cast<MemEventInitCoherence*>(event);
                 processInitCoherenceEvent(eventC, true);
-            } else if (memEvent->getInitCmd() == MemEventInit::InitCommand::Endpoint ) {
-                MemEventInit * mEv = memEvent->clone();
-                mEv->setSrc(getName());
-                linkDown_->sendUntimedData(mEv);
+                delete event;
+            } else if (event->getInitCmd() == MemEventInit::InitCommand::Endpoint ) {
+                event->setSrc(getName());
+                linkDown_->sendUntimedData(event);
+            }
+        } else if (event->getInitCmd() == MemEventInit::InitCommand::Data) {
+            if (mem_h_is_debug_event((event))) {
+                dbg_->debug(_L10_, "U: %-20s   Event:Untimed   (%s)\n",
+                        getName().c_str(), event->getVerboseString().c_str());
+            }
+            if (BasicCommandClassArr[(int)event->getCmd()] == BasicCommandClass::Request) {
+                if (event->getCmd() == Command::GetS) 
+                    init_requests_.insert(std::make_pair(event->getID(), event->getSrc()));
+                event->setSrc(getName());
+                linkDown_->sendUntimedData(event, false, true);
+            } else {
+                event->setSrc(getName());
+                event->setDst(init_requests_.find(event->getID())->second);
+                init_requests_.erase(event->getID());
+                linkDown_->sendUntimedData(event, false, false);
             }
         } else {
-            dbg_->debug(_L10_, "I: %-20s   Event:Init      (%s)\n",
-                    getName().c_str(), memEvent->getVerboseString().c_str());
-            MemEventInit * mEv = memEvent->clone();
-            mEv->setSrc(getName());
-            linkDown_->sendUntimedData(mEv, false);
+            delete event;
         }
-        delete memEvent;
     }
 
-    while (MemEventInit * memEvent = linkDown_->recvUntimedData()) {
-        if (memEvent->getCmd() == Command::NULLCMD) {
-            dbg_->debug(_L10_, "I: %-20s   Event:Init      (%s)\n",
-                    getName().c_str(), memEvent->getVerboseString().c_str());
-
-            if (linkDown_->isDest(memEvent->getSrc()) && memEvent->getInitCmd() == MemEventInit::InitCommand::Coherence) {
-                MemEventInitCoherence * eventC = static_cast<MemEventInitCoherence*>(memEvent);
+    while (MemEventInit * event = linkDown_->recvUntimedData()) {
+        if (event->getCmd() == Command::NULLCMD) {
+            dbg_->debug(_L10_, "U: %-20s   Event:Untimed   (%s)\n",
+                    getName().c_str(), event->getVerboseString().c_str());
+            if (linkDown_->isDest(event->getSrc()) && event->getInitCmd() == MemEventInit::InitCommand::Coherence) {
+                MemEventInitCoherence * eventC = static_cast<MemEventInitCoherence*>(event);
                 processInitCoherenceEvent(eventC, false);
-            } else if (memEvent->getInitCmd() == MemEventInitEndpoint::InitCommand::Endpoint) {
-                MemEventInit * mEv = memEvent->clone();
-                mEv->setSrc(getName());
-                linkUp_->sendUntimedData(mEv);
+                delete event;
+            } else if (event->getInitCmd() == MemEventInitEndpoint::InitCommand::Endpoint) {
+                event->setSrc(getName());
+                linkUp_->sendUntimedData(event);
             }
+        } else if (event->getInitCmd() == MemEventInit::InitCommand::Data) {
+            if (mem_h_is_debug_event((event))) {
+
+                dbg_->debug(_L10_, "U: %-20s   Event:Untimed   (%s)\n",
+                        getName().c_str(), event->getVerboseString().c_str());
+            }
+            if (BasicCommandClassArr[(int)event->getCmd()] == BasicCommandClass::Request) {
+                if (event->getCmd() == Command::GetS) 
+                    init_requests_.insert(std::make_pair(event->getID(), event->getSrc()));
+                event->setSrc(getName());
+                linkUp_->sendUntimedData(event, false, true);
+            } else {
+                event->setSrc(getName());
+                event->setDst(init_requests_.find(event->getID())->second);
+                init_requests_.erase(event->getID());
+                linkUp_->sendUntimedData(event, false, false);
+            }
+        } else {
+            delete event;
         }
-        delete memEvent;
     }
 }
 
@@ -528,8 +592,42 @@ void Cache::setup() {
     // Enqueue the first wakeup event to check for deadlock
     if (timeout_ != 0)
         timeoutSelfLink_->send(1, nullptr);
+    coherenceMgr_->setup();
 }
 
+void Cache::complete(unsigned int phase) {
+    if ( phase == 0 ) {
+        coherenceMgr_->beginCompleteStage();
+    }
+
+    // Case: 1 link
+    if (linkUp_ == linkDown_) {
+        linkDown_->complete(phase);
+
+        while(MemEventInit *event = linkDown_->recvUntimedData()) {
+            dbg_->debug(_L10_, "U: %-20s   Event:Untimed   (%s)\n",
+                    getName().c_str(), event->getVerboseString().c_str());
+            coherenceMgr_->processCompleteEvent(event, linkUp_, linkDown_);
+        }
+        return;
+    }
+
+    // Case: 2 links
+    linkUp_->complete(phase);
+    linkDown_->complete(phase);
+
+    while (MemEventInit * event = linkUp_->recvUntimedData()) {
+        dbg_->debug(_L10_, "U: %-20s   Event:Untimed   (%s)\n",
+                getName().c_str(), event->getVerboseString().c_str());
+        coherenceMgr_->processCompleteEvent(event, linkUp_, linkDown_);
+    }
+
+    while (MemEventInit * event = linkDown_->recvUntimedData()) {
+        dbg_->debug(_L10_, "U: %-20s   Event:Untimed   (%s)\n",
+                getName().c_str(), event->getVerboseString().c_str());
+        coherenceMgr_->processCompleteEvent(event, linkUp_, linkDown_);
+    }
+}
 
 void Cache::finish() {
     if (!clockIsOn_) { // Correct statistics

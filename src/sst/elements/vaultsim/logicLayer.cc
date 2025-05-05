@@ -1,8 +1,8 @@
-// Copyright 2009-2024 NTESS. Under the terms
+// Copyright 2009-2025 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2024, NTESS
+// Copyright (c) 2009-2025, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
@@ -89,7 +89,7 @@ logicLayer::logicLayer( ComponentId_t id, Params& params ) :
     toMem = 0;
   }
 
-  registerClock( frequency, new Clock::Handler<logicLayer>(this, &logicLayer::clock) );
+  registerClock( frequency, new Clock::Handler2<logicLayer,&logicLayer::clock>(this) );
 
   dbg.output(CALL_INFO, "made logicLayer %d %p %p\n", llID, toMem, toCPU);
 
@@ -131,7 +131,7 @@ void logicLayer::init(unsigned int phase) {
                 SST::MemHierarchy::Addr addr = me->getAddr();
                 for (int i = 0; i < numNewEv; ++i) {
                     // make new event
-                    MemEvent *newEv = new MemEvent(this, addr,
+                    MemEvent *newEv = new MemEvent(getName(), addr,
                                                     me->getBaseAddr(),
                                                     me->getCmd());
                     // set size and payload
