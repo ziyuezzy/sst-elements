@@ -116,7 +116,8 @@ public:
 
     RtrEvent() :
         BaseRtrEvent(BaseRtrEvent::PACKET),
-        injectionTime(0)
+        injectionTime(0),
+        Net_injectionTime(0)
     {}
 
     RtrEvent(SST::Interfaces::SimpleNetwork::Request* req, SST::Interfaces::SimpleNetwork::nid_t trusted_src, int route_vn) :
@@ -124,7 +125,8 @@ public:
         request(req),
         trusted_src(trusted_src),
         route_vn(route_vn),
-        injectionTime(0)
+        injectionTime(0),
+        Net_injectionTime(0)
     {}
 
 
@@ -133,7 +135,8 @@ public:
         if (request) delete request;
     }
 
-    inline void setInjectionTime(SimTime_t time) {injectionTime = time;}
+    inline void setInjectionTime(SimTime_t time) {injectionTime = time;} //start of the packet lat
+    inline void setNetworkInjectionTime(SimTime_t time) {Net_injectionTime = time;} //start of the netowrk lat
     // inline void setTraceID(int id) {traceID = id;}
     // inline void setTraceType(TraceType type) {trace = type;}
     virtual RtrEvent* clone(void)  override {
@@ -143,6 +146,7 @@ public:
     }
 
     inline SimTime_t getInjectionTime(void) const { return injectionTime; }
+    inline SimTime_t getNetworkInjectionTime(void) const { return Net_injectionTime; }
     inline SST::Interfaces::SimpleNetwork::Request::TraceType getTraceType() const {return request->getTraceType();}
     inline int getTraceID() const {return request->getTraceID();}
 
@@ -170,11 +174,12 @@ public:
 
     void serialize_order(SST::Core::Serialization::serializer &ser)  override {
         BaseRtrEvent::serialize_order(ser);
-        SST_SER(request);
-        SST_SER(trusted_src);
-        SST_SER(route_vn);
-        SST_SER(size_in_flits);
-        SST_SER(injectionTime);
+        ser & request;
+        ser & trusted_src;
+        ser & route_vn;
+        ser & size_in_flits;
+        ser & injectionTime;
+        ser & Net_injectionTime;
     }
 
 private:
@@ -183,6 +188,7 @@ private:
     SST::Interfaces::SimpleNetwork::nid_t trusted_src;
     int route_vn;
     SimTime_t injectionTime;
+    SimTime_t Net_injectionTime;
     int size_in_flits;
 
     ImplementSerializable(SST::Merlin::RtrEvent)

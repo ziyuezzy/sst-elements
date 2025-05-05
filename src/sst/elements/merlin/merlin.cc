@@ -69,6 +69,10 @@ char pymerlin_topo_dragonfly[] = {
 #include "topology/pymerlin-topo-dragonfly.inc"
     0x00};
 
+char pymerlin_topo_from_graph[] = {
+#include "topology/pymerlin-topo-from_graph.inc"
+    0x00};
+
 char pymerlin_topo_hyperx[] = {
 #include "topology/pymerlin-topo-hyperx.inc"
     0x00};
@@ -102,6 +106,7 @@ public:
         primary_module->addSubModule("interface",pymerlin_interface,"interfaces/pymerlin-interface.py");
         primary_module->addSubModule("targetgen",pymerlin_targetgen,"interfaces/pymerlin-targetgen.py");
         primary_module->addSubModule("topology",pymerlin_topo_dragonfly,"topology/pymerlin-topo-dragonfly.py");
+        primary_module->addSubModule("topology",pymerlin_topo_from_graph,"topology/pymerlin-topo-from_graph.py");
         primary_module->addSubModule("topology",pymerlin_topo_hyperx,"topology/pymerlin-topo-hyperx.py");
         primary_module->addSubModule("topology",pymerlin_topo_fattree,"topology/pymerlin-topo-fattree.py");
         primary_module->addSubModule("topology",pymerlin_topo_mesh,"topology/pymerlin-topo-mesh.py");

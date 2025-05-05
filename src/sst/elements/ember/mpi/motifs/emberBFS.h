@@ -340,7 +340,7 @@ public:
     )
 
     SST_ELI_DOCUMENT_PARAMS(
-        {   "arg.sz",          "Sets the graph size",              "14"},
+        {   "arg.",          "Sets the graph size",              "14"},
         {   "arg.seed",        "Sets the RNG seed",                "1"},
         {   "arg.msg_model",   "Communication volume model file",  "msg.model"},
         {   "arg.exec_model",  "Computation timing model file",    "exec.model"},

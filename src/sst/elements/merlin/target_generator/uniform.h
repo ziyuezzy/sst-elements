@@ -64,7 +64,10 @@ public:
 
         gen = new SST::RNG::MersenneRNG(id);
 
-        int dist_size = std::max(1, max-min);
+        // int dist_size = std::max(1, max-min);//this lead to wrong size??! --ziyue
+        int dist_size = std::max(1, max-min+1);//modified by ziyue
+        //However, this will lead to dest_id==id.
+
         dist = new SSTUniformDistribution(dist_size, gen);
 
     }

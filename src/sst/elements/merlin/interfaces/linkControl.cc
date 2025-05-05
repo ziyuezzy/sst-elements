@@ -143,11 +143,12 @@ LinkControl::LinkControl(ComponentId_t cid, Params &params, int vns) :
 
 
     // Register statistics
-    packet_latency = registerStatistic<uint64_t>("packet_latency");
+    // packet_latency = registerStatistic<uint64_t>("packet_latency");
+    network_latency = registerStatistic<uint64_t>("network_latency");//added by ziyue
     send_bit_count = registerStatistic<uint64_t>("send_bit_count");
     output_port_stalls = registerStatistic<uint64_t>("output_port_stalls");
     idle_time = registerStatistic<uint64_t>("idle_time");
-    // recv_bit_count = registerStatistic<uint64_t>("recv_bit_count");
+    recv_bit_count = registerStatistic<uint64_t>("recv_bit_count");
 
     last_time = 0;
     last_recv_time = 0;
@@ -422,7 +423,7 @@ void LinkControl::finish(void)
 
 // Returns true if there is space in the output buffer and false
 // otherwise.
-bool LinkControl::send(SimpleNetwork::Request* req, int vn) {
+bool LinkControl::send(SimpleNetwork::Request* req, int vn) { //TODO: additional parameter of overload function -- time of packet creation
     // Check to see if the VN is in range
     if ( vn >= req_vns ) return false;
     req->vn = vn;
@@ -453,7 +454,7 @@ bool LinkControl::send(SimpleNetwork::Request* req, int vn) {
     out_handle.credits -= flits;
     // ev->request->vn = vn;
 
-    ev->setInjectionTime(getCurrentSimTimeNano());
+    ev->setInjectionTime(getCurrentSimTimeNano()); //this is be the start of PacketLat
     out_handle.queue.push(ev);
     if ( waiting && !have_packets ) {
         output_timing->send(1,nullptr);
@@ -504,10 +505,20 @@ SST::Interfaces::SimpleNetwork::Request* LinkControl::recv(int vn) {
                       getCurrentSimTimeNano(), getName().c_str());
     }
 
+    //added by ziyue: set arrival time
+    // SimTime_t plat = getCurrentSimTimeNano() - event->getInjectionTime();
+    SimTime_t nlat = getCurrentSimTimeNano() - event->getNetworkInjectionTime();
+    if ( event->getType() == BaseRtrEvent::PACKET ){ //this line is added by ziyue, only count if it is a payload, otherwise it will be seg.fault.
+        recv_bit_count->addData(event->getSizeInBits()); 
+        // packet_latency->addData(plat);
+        network_latency->addData(nlat);
+    }
+    //==================
+
     SST::Interfaces::SimpleNetwork::Request* ret = event->takeRequest();
     if ( use_nid_map ) ret->dest = logical_nid;
     delete event;
-;
+
     return ret;
 }
 
@@ -619,9 +630,12 @@ void LinkControl::handle_input(Event* ev)
                           event->getTrustedSrc());
         }
 
+        /*commented out by ziyue: this is moved into recv()
         SimTime_t lat = getCurrentSimTimeNano() - event->getInjectionTime();
         // recv_bit_count->addData(event->getSizeInBits());
         packet_latency->addData(lat);
+        */    
+
         if ( receiveFunctor != nullptr ) {
             bool keep = (*receiveFunctor)(vn);
             if ( !keep) receiveFunctor = nullptr;
@@ -722,7 +736,7 @@ void LinkControl::handle_output(Event* ev)
         if ( curr_out_vn == used_vns ) curr_out_vn = 0;
 
         // Add in inject time so we can track latencies
-        send_event->setInjectionTime(getCurrentSimTimeNano());
+        send_event->setNetworkInjectionTime(getCurrentSimTimeNano()); //this is the start of NetworkLat --ziyue
 
         // Subtract credits
         router_credits[output_queues[vn_to_send].vn] -= size;

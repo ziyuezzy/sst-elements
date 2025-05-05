@@ -114,6 +114,8 @@ class BasicNicConfiguration(TemplateBase):
             "packetOverhead", "packetSize",
             "maxActiveRecvStreams", "maxPendingRecvPkts",
             "dmaBW_GBs", "dmaContentionMult",
+            "gen_InterNIC_traffic_trace",
+            "interNIC_traffic_tracefile_path"
             ])
 
         self._declareParams("main",["useSimpleMemoryModel"])
