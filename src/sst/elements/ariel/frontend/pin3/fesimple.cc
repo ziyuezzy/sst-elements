@@ -428,15 +428,17 @@ VOID WriteEndInstructionMarker(UINT32 thr, ADDRINT ip)
 
 VOID WriteInstructionReadWrite(THREADID thr, ADDRINT* readAddr, UINT32 readSize,
             ADDRINT* writeAddr, UINT32 writeSize, ADDRINT ip, UINT32 instClass,
-            UINT32 simdOpWidth )
+            UINT32 simdOpWidth, BOOL first, BOOL last )
 {
 
     if(enable_output) {
         if(thr < core_count) {
-            WriteStartInstructionMarker( thr, ip, instClass, simdOpWidth);
+            if (first)
+                WriteStartInstructionMarker( thr, ip, instClass, simdOpWidth);
             WriteInstructionRead(  readAddr,  readSize,  thr, ip, instClass, simdOpWidth );
             WriteInstructionWrite( writeAddr, writeSize, thr, ip, instClass, simdOpWidth );
-            WriteEndInstructionMarker( thr, ip );
+            if (last)
+                WriteEndInstructionMarker( thr, ip );
         }
     }
 }
@@ -555,17 +557,33 @@ VOID InstrumentInstruction(INS ins, VOID *v)
             }
         }
     }
-   
+
     UINT32 operands = INS_MemoryOperandCount(ins);
+    if (INS_HasScatteredMemoryAccess(ins))
+        operands = 0;
     for (UINT32 op = 0; op < operands; op++) {
         BOOL first = (op == 0);
         BOOL last = (op == (operands - 1));
-        
-        if (INS_MemoryOperandIsRead(ins, op)) {
+
+        if (INS_MemoryOperandIsRead(ins, op) && INS_MemoryOperandIsWritten(ins, op)) {
+            USIZE opSize = INS_MemoryOperandSize(ins, op);
+            INS_InsertPredicatedCall(ins, IPOINT_BEFORE, (AFUNPTR)
+                    WriteInstructionReadWrite,
+                    IARG_THREAD_ID,
+                    IARG_MEMORYREAD_EA, IARG_UINT32, opSize,
+                    IARG_MEMORYWRITE_EA, IARG_UINT32, opSize,
+                    IARG_INST_PTR,
+                    IARG_UINT32, instClass,
+                    IARG_UINT32, simdOpWidth,
+                    IARG_BOOL, first,
+                    IARG_BOOL, last,
+                    IARG_END);
+        } else if (INS_MemoryOperandIsRead(ins, op)) {
+            USIZE opSize = INS_MemoryOperandSize(ins, op);
             INS_InsertPredicatedCall(ins, IPOINT_BEFORE, (AFUNPTR)
                     WriteInstructionReadOnly,
                     IARG_THREAD_ID,
-                    IARG_MEMORYREAD_EA, IARG_UINT32, INS_MemoryOperandSize(ins, op),
+                    IARG_MEMORYREAD_EA, IARG_UINT32, opSize,
                     IARG_INST_PTR,
                     IARG_UINT32, instClass,
                     IARG_UINT32, simdOpWidth,
@@ -573,17 +591,17 @@ VOID InstrumentInstruction(INS ins, VOID *v)
                     IARG_BOOL, last,
                     IARG_END);
         } else {
+            USIZE opSize = INS_MemoryOperandSize(ins, op);
             INS_InsertPredicatedCall(ins, IPOINT_BEFORE, (AFUNPTR)
                     WriteInstructionWriteOnly,
                     IARG_THREAD_ID,
-                    IARG_MEMORYWRITE_EA, IARG_UINT32, INS_MemoryOperandSize(ins, op),
+                    IARG_MEMORYWRITE_EA, IARG_UINT32, opSize,
                     IARG_INST_PTR,
                     IARG_UINT32, instClass,
                     IARG_UINT32, simdOpWidth,
                     IARG_BOOL, first,
                     IARG_BOOL, last,
                     IARG_END);
-
         }
     }
 
@@ -1168,14 +1186,14 @@ void mapped_ariel_malloc_flag(int64_t mallocLocId, int count, int level)
 }
 
 void ariel_start_RTL_sim(RTL_shmem_info* rtl_shmem) {
-    
-    ArielCommand acRtl; 
+
+    ArielCommand acRtl;
     acRtl.command = ARIEL_ISSUE_RTL;
     acRtl.shmem.inp_size = rtl_shmem->get_inp_size();
     acRtl.shmem.ctrl_size = rtl_shmem->get_ctrl_size();
     acRtl.shmem.updated_rtl_params_size = rtl_shmem->get_params_size();
 
-    acRtl.shmem.inp_ptr = rtl_shmem->get_inp_ptr(); 
+    acRtl.shmem.inp_ptr = rtl_shmem->get_inp_ptr();
     acRtl.shmem.ctrl_ptr = rtl_shmem->get_ctrl_ptr();
     acRtl.shmem.updated_rtl_params = rtl_shmem->get_updated_rtl_params();
 
@@ -1185,7 +1203,7 @@ void ariel_start_RTL_sim(RTL_shmem_info* rtl_shmem) {
     #ifdef ARIEL_DEBUG
     fprintf(stderr, "\nMessage to add RTL Event into Ariel Event Queue successfully delivered via ArielTunnel");
     #endif
-    
+
     return;
 }
 
@@ -1196,7 +1214,7 @@ void ariel_update_RTL_signals(RTL_shmem_info* rtl_shmem) {
     acRtl.shmem.inp_size = rtl_shmem->get_inp_size();
     acRtl.shmem.ctrl_size = rtl_shmem->get_ctrl_size();
     acRtl.shmem.updated_rtl_params_size = rtl_shmem->get_params_size();
-    acRtl.shmem.inp_ptr = rtl_shmem->get_inp_ptr(); 
+    acRtl.shmem.inp_ptr = rtl_shmem->get_inp_ptr();
     acRtl.shmem.ctrl_ptr = rtl_shmem->get_ctrl_ptr();
     acRtl.shmem.updated_rtl_params = rtl_shmem->get_updated_rtl_params();
 
@@ -1206,7 +1224,7 @@ void ariel_update_RTL_signals(RTL_shmem_info* rtl_shmem) {
     #ifdef ARIEL_DEBUG
     fprintf(stderr, "\nMessage to add RTL Event into Ariel Event Queue to update RTL signals successfully delivered via ArielTunnel");
     #endif
-    
+
     return;
 }
 
@@ -1268,12 +1286,12 @@ VOID InstrumentRoutine(RTN rtn, VOID* args)
 #endif
     } else if (RTN_Name(rtn) == "start_RTL_sim") {
         fprintf(stderr,"Identified routine: start_RTL_sim, replacing with Ariel equivalent...\n");
-        RTN_Replace(rtn, (AFUNPTR) ariel_start_RTL_sim); 
+        RTN_Replace(rtn, (AFUNPTR) ariel_start_RTL_sim);
         fprintf(stderr,"Replacement complete.\n");
         return;
     } else if(RTN_Name(rtn) == "update_RTL_sig") {
         fprintf(stderr,"Identified routine: update_RTL_signals, replacing with Ariel equivalent...\n");
-        RTN_Replace(rtn, (AFUNPTR) ariel_update_RTL_signals); 
+        RTN_Replace(rtn, (AFUNPTR) ariel_update_RTL_signals);
         fprintf(stderr,"Replacement complete.\n");
         return;
 

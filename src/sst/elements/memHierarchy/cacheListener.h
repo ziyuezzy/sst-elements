@@ -57,8 +57,8 @@ public:
     NotifyAccessType getAccessType() const { return access; }
     NotifyResultType getResultType() const { return result; }
     uint32_t getSize() const { return size; }
-        
-    CacheListenerNotification() { } // For serialization
+
+    CacheListenerNotification() = default; // For serialization
 
     void serialize_order(SST::Core::Serialization::serializer& ser) {
         SST_SER(size);
@@ -95,13 +95,13 @@ public:
     )
 
     CacheListener(ComponentId_t id, Params& params) : SubComponent(id) {}
-    CacheListener() : SubComponent() {}
+    CacheListener() = default;
     virtual ~CacheListener() {}
 
     virtual void printStats(Output& out) {}
     virtual void notifyAccess(const CacheListenerNotification& notify) {}
     virtual void registerResponseCallback(Event::HandlerBase *handler) { delete handler; }
-    
+
     void serialize_order(SST::Core::Serialization::serializer& ser) override {
         SST::SubComponent::serialize_order(ser);
     }

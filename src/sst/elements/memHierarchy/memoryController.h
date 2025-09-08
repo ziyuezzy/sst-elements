@@ -132,11 +132,11 @@ protected:
 
     Output out;
     Output dbg;
-    std::set<Addr> DEBUG_ADDR;
+    std::set<Addr> debug_addr_filter_;
     int dlevel;
 
     MemBackendConvertor*    memBackendConvertor_;
-    
+
     Backend::Backing*       backing_;
     std::string backing_outfile_;
 

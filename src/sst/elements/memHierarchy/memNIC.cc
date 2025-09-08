@@ -29,7 +29,7 @@ using namespace SST::Interfaces;
 /* Constructor */
 
 MemNIC::MemNIC(ComponentId_t id, Params &params, TimeConverter* tc) : MemNICBase(id, params, tc) {
-    
+
     link_control = loadUserSubComponent<SimpleNetwork>("linkcontrol", ComponentInfo::SHARE_NONE, 1); // 1 is the num virtual networks
     if (!link_control) {
         Params netparams;
@@ -44,6 +44,9 @@ MemNIC::MemNIC(ComponentId_t id, Params &params, TimeConverter* tc) : MemNICBase
                     getName().c_str());
 
         link_control = loadAnonymousSubComponent<SimpleNetwork>(link_control_class, "linkcontrol", 0, ComponentInfo::SHARE_PORTS | ComponentInfo::INSERT_STATS, netparams, 1);
+        if (!link_control) {
+            dbg.fatal(CALL_INFO, -1, "%s, Error: MemNIC is unable to load the default merlin.linkcontrol subcomponent. Ensure merlin library is available or load a linkcontrol in the MemNIC's 'linkcontrol' subcomponent slot\n", getName().c_str());
+        }
     }
     link_control->setNotifyOnReceive(new SimpleNetwork::Handler2<MemNIC, &MemNIC::recvNotify>(this));
 
@@ -85,7 +88,7 @@ bool MemNIC::recvNotify(int) {
         delete mre;
         if (ev) {
             if (mem_h_is_debug_event(ev)) {
-                dbg.debug(_L5_, "E: %-40" PRIu64 "  %-20s NIC:Recv      (%s)\n", 
+                dbg.debug(_L5_, "E: %-40" PRIu64 "  %-20s NIC:Recv      (%s)\n",
                     getCurrentSimCycle(), getName().c_str(), ev->getBriefString().c_str());
             }
             (*recvHandler)(ev);

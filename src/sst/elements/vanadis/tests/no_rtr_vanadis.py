@@ -5,7 +5,7 @@ import sst
 dbg_addr = [0x20019ec0,0xfefefefefefefec0]
 #dbg_addr = [536977088,18374403900871474880]
 #dbg_addr = "0"
-mh_dbg = 0 
+mh_dbg = 0
 
 #vanadis_isa = os.getenv("VANADIS_ISA", "MIPS")
 #isa="mipsel"
@@ -108,7 +108,7 @@ v_cpu_0.addParams({
        "issues_per_cycle" :  issues_per_cycle,
        "retires_per_cycle" : retires_per_cycle,
        #"pause_when_retire_address" : os.getenv("VANADIS_HALT_AT_ADDRESS", 0),
-       #"start_verbose_when_issue_address" : os.getenv("VANADIS_START_DBG_AT_ADDRESS", 0) 
+       #"start_verbose_when_issue_address" : os.getenv("VANADIS_START_DBG_AT_ADDRESS", 0)
 #       "reorder_slots" : 32,
 #       "decodes_per_cycle" : 2,
 #       "issues_per_cycle" :  1,
@@ -137,12 +137,12 @@ vanadis_os_hdlr = "vanadis.Vanadis" + vanadis_isa + "OSHandler"
 if vanadis_isa == "MIPS":
 	lsq_mask = 0xFFFFFFFF
 
-decode0     = v_cpu_0.setSubComponent( "decoder0", vanadis_decoder )
-os_hdlr     = decode0.setSubComponent( "os_handler", vanadis_os_hdlr )
-#os_hdlr     = decode0.setSubComponent( "os_handler", "vanadis.VanadisMIPSOSHandler" )
-branch_pred = decode0.setSubComponent( "branch_unit", "vanadis.VanadisBasicBranchUnit" )
+decode     = v_cpu_0.setSubComponent( "decoder", vanadis_decoder )
+os_hdlr     = decode.setSubComponent( "os_handler", vanadis_os_hdlr )
+#os_hdlr     = decode.setSubComponent( "os_handler", "vanadis.VanadisMIPSOSHandler" )
+branch_pred = decode.setSubComponent( "branch_unit", "vanadis.VanadisBasicBranchUnit" )
 
-decode0.addParams({
+decode.addParams({
 	"uop_cache_entries" : 1536,
 	"predecode_cache_entries" : 4
 })
@@ -202,7 +202,7 @@ os_l1dcache.addParams({
       "L1" : "1",
       "debug" : mh_dbg,
       "debug_level" : 10,
-      "debug_addr" : dbg_addr, 
+      "debug_addr" : dbg_addr,
 })
 
 cpu0_l1dcache = sst.Component("cpu0.l1dcache", "memHierarchy.Cache")
@@ -217,7 +217,7 @@ cpu0_l1dcache.addParams({
       "L1" : "1",
       "debug" : mh_dbg,
       "debug_level" : 10,
-      "debug_addr" : dbg_addr, 
+      "debug_addr" : dbg_addr,
 })
 
 cpu0_l1icache = sst.Component("cpu0.l1icache", "memHierarchy.Cache")
@@ -234,7 +234,7 @@ cpu0_l1icache.addParams({
       "L1" : "1",
       "debug" : mh_dbg,
       "debug_level" : 10,
-      "debug_addr" : dbg_addr, 
+      "debug_addr" : dbg_addr,
 })
 
 cpu0_l2cache = sst.Component("l2cache", "memHierarchy.Cache")
@@ -248,7 +248,7 @@ cpu0_l2cache.addParams({
       "cache_size" : "1MB",
       "debug" : mh_dbg,
       "debug_level" : 10,
-      "debug_addr" : dbg_addr, 
+      "debug_addr" : dbg_addr,
 })
 
 cache_bus = sst.Component("bus", "memHierarchy.Bus")
@@ -266,9 +266,9 @@ dirctrl.addParams({
       "addr_range_end" : "0xFFFFFFFF",
       "debug" : mh_dbg,
       "debug_level" : 10,
-      "debug_addr" : dbg_addr, 
+      "debug_addr" : dbg_addr,
 })
-dirtoM = dirctrl.setSubComponent("memlink", "memHierarchy.MemLink")
+dirtoM = dirctrl.setSubComponent("lowlink", "memHierarchy.MemLink")
 
 memctrl = sst.Component("memory", "memHierarchy.MemController")
 memctrl.addParams({
@@ -276,11 +276,11 @@ memctrl.addParams({
       "backend.mem_size" : "4GiB",
       "backing" : "malloc",
       "initBacking": 1,
-      "addr_range_start": 0, 
-      "addr_range_end": 0xffffffff, 
+      "addr_range_start": 0,
+      "addr_range_end": 0xffffffff,
       "debug" : mh_dbg,
       "debug_level" : 10,
-      "debug_addr" : dbg_addr, 
+      "debug_addr" : dbg_addr,
 })
 
 memory = memctrl.setSubComponent("backend", "memHierarchy.simpleMem")
@@ -291,7 +291,7 @@ memory.addParams({
 
 sst.setStatisticOutput("sst.statOutputConsole")
 v_cpu_0.enableAllStatistics()
-decode0.enableAllStatistics()
+decode.enableAllStatistics()
 v_cpu_0_lsq.enableAllStatistics()
 branch_pred.enableAllStatistics()
 

@@ -121,10 +121,10 @@ public:
         out.output("  MemHierarchy::MemLink: No status given\n");
     }
     virtual std::string getAvailableDestinationsAsString() override;
-    
+
     void recvNotify(SST::Event * ev) { (*recvHandler)(ev); }
 
-    MemLink() { }
+    MemLink() = default;
     void serialize_order(SST::Core::Serialization::serializer& ser) override;
     ImplementSerializable(SST::MemHierarchy::MemLink)
 protected:
