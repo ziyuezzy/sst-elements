@@ -277,6 +277,6 @@ class topoAny(Topology):
                 if networkIF:
                     nicLink = sst.Link("link_r%d_localEP%d"%(r, local_id))
                     nicLink.connect( (networkIF, port_name, self.host_link_latency), (routers[r], "port%d"%(self.num_R2R_ports_map[r] + local_id), self.host_link_latency) )
-                    # print(f"router {r}'s port{port_id} is connected to EP {nodeID}'s port {port_name}")
+                    # print(f"router {r}'s port{self.num_R2R_ports_map[r] + local_id} is connected to EP {global_id}'s port {port_name}")
                 else:
                     raise AssertionError(f"Failed to build endpoint {global_id}, local EP ID {local_id} for router {r}")

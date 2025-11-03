@@ -30,8 +30,10 @@ public:
     // int dest_EP_id; 
     // // the id of the source endpoint
     // int src_EP_id;  
-    // number of hops the packet has traveled
-    int num_hops;   
+    
+    // number of hops the packet has traveled, this will only control the VC
+    int num_hops;
+
     // the next router id to forward to
     // If source routing is used, this will be read from the encapsulated request (similar to the segment routing header in IPv6)
     // If destination-tag routing is used, this will be determined by the routing table of the current router
@@ -146,6 +148,8 @@ public:
 
     void Parse_routing_info(SST::Params &params);
     virtual void route_packet(int input_port, int vc, internal_router_event* ev);
+    void route_untimed_packet(int input_port, int vc, internal_router_event* ev);
+    void route_simple(topo_any_event* ev);
     void route_packet_SR(topo_any_event* ev);
     void route_packet_dest_tag(int input_port, int vc, topo_any_event* ev);
     virtual internal_router_event* process_input(RtrEvent* ev);

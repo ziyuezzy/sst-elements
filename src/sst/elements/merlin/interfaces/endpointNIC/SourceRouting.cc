@@ -19,9 +19,9 @@ RandomWeightedSelection::~RandomWeightedSelection() {
     delete rng;
 }
 
-std::vector<int> RandomWeightedSelection::selectPath(int dest_router, const std::vector<path_with_weight>& paths) {
+std::deque<int> RandomWeightedSelection::selectPath(int dest_router, const std::vector<path_with_weight>& paths) {
     if (paths.empty()) {
-        return std::vector<int>();
+        return std::deque<int>();
     }
     
     if (paths.size() == 1) {
@@ -56,9 +56,9 @@ WeightedRoundRobinSelection::WeightedRoundRobinSelection() {
 WeightedRoundRobinSelection::~WeightedRoundRobinSelection() {
 }
 
-std::vector<int> WeightedRoundRobinSelection::selectPath(int dest_router, const std::vector<path_with_weight>& paths) {
+std::deque<int> WeightedRoundRobinSelection::selectPath(int dest_router, const std::vector<path_with_weight>& paths) {
     if (paths.empty()) {
-        return std::vector<int>();
+        return std::deque<int>();
     }
     
     if (paths.size() == 1) {
@@ -170,9 +170,9 @@ SST::Interfaces::SimpleNetwork::Request* SourceRoutingPlugin::processOutgoing(
     SourceRoutingMetadata sr_meta;
     if (!ext_req->getMetadata("SourceRouting", sr_meta) || sr_meta.path.empty()) {
         // Lookup path in routing table and set it as metadata
-        std::vector<int> path = selectPath(lookupRtrForEndpoint(ext_req->dest));
-        sr_meta.path = path;
-        ext_req->setMetadata("SourceRouting", sr_meta);
+        std::deque<int> path = selectPath(lookupRtrForEndpoint(ext_req->dest));
+        SourceRoutingMetadata new_sr_meta(path);        
+        ext_req->setMetadata("SourceRouting", new_sr_meta);
     }
 
     // //TODO: print output req src and dest and assigned path:=======
@@ -250,7 +250,7 @@ routing_entries SourceRoutingPlugin::parseRoutingEntryFromString(const std::stri
                 if (hop_parts.empty()) continue;
                 
                 float weight = std::stof(hop_parts[0]);
-                std::vector<int> path;
+                std::deque<int> path;
                 
                 for (size_t i = 1; i < hop_parts.size(); i++) {
                     path.push_back(std::stoi(hop_parts[i]));
@@ -296,11 +296,11 @@ void SourceRoutingPlugin::initializePathSelectionAlgorithm(const std::string& al
     }
 }
 
-std::vector<int> SourceRoutingPlugin::selectPath(int dest_router) {
+std::deque<int> SourceRoutingPlugin::selectPath(int dest_router) {
 
     if (dest_router == myRtrID){
         output.verbose(CALL_INFO, 1, 0, "Assigning empty path for endpoints in the same router. \n");
-        return std::vector<int>();
+        return std::deque<int>();
     }else{
         return path_selector->selectPath(dest_router, routing_table[myRtrID][dest_router]);
     }
