@@ -65,6 +65,18 @@ topo_any::topo_any(ComponentId_t cid, Params& params, int num_ports, int rtr_id,
     }
 
     Parse_routing_info(params);
+
+    params.find_map<int, int>("endpoint_to_port_map", endpoint_to_port_map);
+    if (endpoint_to_port_map.empty()) {
+        output.fatal(CALL_INFO, -1, "No endpoint-to-port mapping provided\n");
+    }
+
+    params.find_map<int, int>("port_to_endpoint_map", port_to_endpoint_map);
+    if (port_to_endpoint_map.empty()) {
+        output.fatal(CALL_INFO, -1, "No port-to-endpoint mapping provided\n");
+    }
+
+    output.setVerboseLevel(params.find<int>("verbose_level", 0));
 }
 
 void SST::Merlin::topo_any::Parse_routing_info(SST::Params &params)
@@ -213,7 +225,8 @@ int topo_any::getEndpointID(int port_id) {
         assert(!Topology::isHostPort(port_id));
         return -1;
     }else{
-        return router_id * num_R2N_ports + (port_id - num_R2R_ports);
+        return port_to_endpoint_map.at(port_id);
+        // return router_id * num_R2N_ports + (port_id - num_R2R_ports);
     }
 }
 
@@ -224,14 +237,14 @@ int topo_any::get_router_id(int EP_id) const
     auto it = ep_map.find(EP_id);
     if (it != ep_map.end()) {
         return it->second;
+    }else {
+        fatal(CALL_INFO, -1, "WARNING: Endpoint %d not found in endpoint_to_router_map.", EP_id);
     }
-    
-    fatal(CALL_INFO, -1, "WARNING: Endpoint %d not found in endpoint_to_router_map.", EP_id);
 }
 
 int topo_any::get_dest_local_port(int dest_EP_id) const
 {
-    return num_R2R_ports + (dest_EP_id % num_R2N_ports);
+    return endpoint_to_port_map.at(dest_EP_id);
 }
 
 //===============================================================
@@ -356,12 +369,19 @@ void topo_any::route_packet_SR(topo_any_event* ev) {
             // Arriving at destination router, forward to endpoint
             
             int dest_EP_id = ev->getDest();
+            if (dest_EP_id == -1){
+                fatal(CALL_INFO, -1, "ERROR: Source routing packet missing destination endpoint ID\n");
+            }
+            
             if (get_router_id(dest_EP_id) != router_id) {
                 fatal(CALL_INFO, -1, "ERROR: destination endpoint %d is not contained within this router %d\n",
                     dest_EP_id, router_id);
             }
             ev->next_router_id = -1; // no next router
             fwd_port = get_dest_local_port(dest_EP_id);
+
+            output.verbose(CALL_INFO, 2, 0, "destination router %d forwarding packet to dest EP %d via port %d\n",
+                router_id, dest_EP_id, fwd_port);
         } else {
             // Intermediate hop - determine the next router and forward to the corresponding port
             // assert that there is a front element
@@ -370,6 +390,9 @@ void topo_any::route_packet_SR(topo_any_event* ev) {
             sr_path->pop_front(); // remove the current router from the path
             ev->setVC(ev->num_hops);
             fwd_port = getPortToRouter(ev->next_router_id);
+
+            output.verbose(CALL_INFO, 2, 0, "Intermediate router %d routing packet to next router %d via port %d\n",
+                router_id, ev->next_router_id, fwd_port);
         }
 
         if (fwd_port == -1) {

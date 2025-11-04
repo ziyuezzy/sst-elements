@@ -165,7 +165,7 @@ public:
     // note that the port_id starts from 0 to num_R2R_ports-1 for R2R ports, 
     // and from num_R2R_ports to num_R2R_ports+num_R2N_ports-1 for R2N ports
     virtual PortState getPortState(int port_id) const;
-    // will return -1 if the port is not an R2N port
+    // // will return -1 if the port is not an R2N port
     virtual int getEndpointID(int port_id);
 
 
@@ -190,14 +190,14 @@ private:
             if( router_id == 0 ) {// only print the warning once
                 try {
                     if constexpr (std::is_arithmetic<T>::value) {
-                        output.output("WARNING: Parameter '%s' not found for anytopo, using default value: %s\n", key.c_str(), std::to_string(default_val).c_str());
+                        output.verbose(CALL_INFO, 1, 0, "WARNING: Parameter '%s' not found for anytopo, using default value: %s\n", key.c_str(), std::to_string(default_val).c_str());
                     } else if constexpr (std::is_same<T, std::string>::value) {
-                        output.output("WARNING: Parameter '%s' not found for anytopo, using default value: %s\n", key.c_str(), default_val.c_str());
+                        output.verbose(CALL_INFO, 1, 0, "WARNING: Parameter '%s' not found for anytopo, using default value: %s\n", key.c_str(), default_val.c_str());
                     } else {
-                        output.output("WARNING: Parameter '%s' not found for anytopo, using default value (unprintable type)\n", key.c_str());
+                        output.verbose(CALL_INFO, 1, 0, "WARNING: Parameter '%s' not found for anytopo, using default value (unprintable type)\n", key.c_str());
                     }
                 } catch (...) {
-                    output.output("WARNING: Parameter '%s' not found for anytopo, using default value (unprintable type)\n", key.c_str());
+                    output.verbose(CALL_INFO, 1, 0, "WARNING: Parameter '%s' not found for anytopo, using default value (unprintable type)\n", key.c_str());
                 }
             }
         }
@@ -225,6 +225,9 @@ private:
     // for now ports are randomly selected
     int getPortToRouter(int target_router_id) const;
     std::set<int>& getPortsToRouter(int target_router_id) const;
+
+    std::map<int, int> endpoint_to_port_map; // maps from the endpoint ID to the port ID.
+    std::map<int, int> port_to_endpoint_map; // maps from the port ID to the endpoint ID.
 
     // void route_nonadaptive(int port, int vc, internal_router_event* ev, int dest_router);
     // void route_nonadaptive_weighted(int port, int vc, internal_router_event* ev, int dest_router);

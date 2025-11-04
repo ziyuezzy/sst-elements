@@ -9,7 +9,7 @@ namespace Merlin {
 
 // Initialize static members
 std::vector<routing_entries> SourceRoutingPlugin::routing_table;
-std::map<int, int> SourceRoutingPlugin::endpoint_to_router_map;
+std::map<int, int> SourceRoutingPlugin::endpoint_to_router_map = std::map<int, int>();
 
 RandomWeightedSelection::RandomWeightedSelection(ComponentId_t cid) {
     rng = new SST::RNG::MersenneRNG(cid);
@@ -115,16 +115,21 @@ SourceRoutingPlugin::SourceRoutingPlugin(ComponentId_t cid, Params& params) :
     std::string algorithm = params.find<std::string>("path_selection_algorithm", "random_weighted");
     initializePathSelectionAlgorithm(algorithm);
 
-    // Parse endpoint-to-router mapping
-    // Expected format from Python: "{0:0, 1:0, 2:1, 3:1, ...}"
-    params.find_map<int, int>("endpoint_router_mapping", endpoint_to_router_map);
+    if (endpoint_to_router_map.empty()) {
+        // Parse endpoint-to-router mapping
+        // Expected format from Python: dict like "{0:0, 1:0, 2:1, 3:1, ...}"
+        params.find_map<int, int>("endpoint_router_mapping", endpoint_to_router_map);
+        if (endpoint_to_router_map.empty()) {
+            output.fatal(CALL_INFO, -1, "No endpoint-to-router mapping provided\n");
+        }
 
-    if (!endpoint_to_router_map.empty()) {
+        // TODO: print out this map
+        for (const auto& entry : endpoint_to_router_map) {
+            output.verbose(CALL_INFO, 2, 0, "Endpoint %d -> Router %d\n", entry.first, entry.second);
+        }
+
         output.verbose(CALL_INFO, 1, 0, "Loaded endpoint-to-router mapping for %zu endpoints\n",
                     endpoint_to_router_map.size());
-    } else {
-        // this is fatal
-        output.fatal(CALL_INFO, -1, "No endpoint-to-router mapping provided\n");
     }
 
     // Now we can safely use endpoint_id
