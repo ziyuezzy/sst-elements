@@ -1,5 +1,19 @@
 #!/usr/bin/env python
-# TODO: copyright goes here?
+#
+# Copyright 2009-2025 NTESS. Under the terms
+# of Contract DE-NA0003525 with NTESS, the U.S.
+# Government retains certain rights in this software.
+#
+# Copyright (c) 2009-2025, NTESS
+# All rights reserved.
+#
+# Portions are copyright of other developers:
+# See the file CONTRIBUTORS.TXT in the top level directory
+# of the distribution for more information.
+#
+# This file is part of the SST software package. For license
+# information, see the LICENSE file in the top level directory of the
+# distribution.
 
 """
 SST Merlin Any Topology Module
@@ -21,11 +35,6 @@ import os
 from collections import defaultdict
 from typing import Callable, Optional
 
-try:
-    import networkx as nx
-except ImportError:
-    raise ImportError("NetworkX is required for the 'topo_any' python module. Please install NetworkX and try again.")
-
 def _networkx_Dijkstra_shortest_path(input_nx_graph) -> dict:
     """
     An example implementation of *single* shortest path using Dijkstra's algorithm from NetworkX.
@@ -33,6 +42,11 @@ def _networkx_Dijkstra_shortest_path(input_nx_graph) -> dict:
     Each path is represented as a list of router ids, and only one shortest path between two routers will be returned with weight 1.0.
     This will be used for source-routing mode in topoAny topology.
     """
+    try:
+        import networkx as nx
+    except ImportError:
+        raise ImportError("NetworkX is required for the 'topo_any' python module. Please install NetworkX and try again.")
+    
     if input_nx_graph.number_of_nodes() == 0 or input_nx_graph.number_of_edges() == 0:
         raise AssertionError("Graph empty.")
 
@@ -58,6 +72,11 @@ def _networkx_Dijkstra_all_shortest_paths(input_nx_graph) -> dict:
     Each path is represented as a list of router ids, and the paths between two routers will be assigned equal weights.
     This will be used for source-routing mode in topoAny topology.
     """
+    try:
+        import networkx as nx
+    except ImportError:
+        raise ImportError("NetworkX is required for the 'topo_any' python module. Please install NetworkX and try again.")
+    
     if input_nx_graph.number_of_nodes() == 0 or input_nx_graph.number_of_edges() == 0:
         raise AssertionError("Graph empty.")
 
@@ -93,7 +112,8 @@ class topoAny(Topology):
                                      "tot_num_endpoints", "rtr_to_EPs", "EP_to_rtr", "simple_routing_table"])
         self._declareParams("shared",["num_routers", "routing_mode", "verbose_level"])
         self._subscribeToPlatformParamSet("topology")
-        self.loaded_graph = nx.empty_graph()
+        # Use a placeholder for empty graph - will be replaced when import_graph is called
+        self.loaded_graph = None
         self.rtr_to_EPs = defaultdict(list)   # dict[int, list[int]], default to empty list
         self.EP_to_rtr = {}                 # dict[int, int]
         self.simple_routing_table = {}
@@ -150,6 +170,11 @@ class topoAny(Topology):
         Args:
             graph_input: Either a NetworkX Graph object or a string path to a GraphML file
         """
+        try:
+            import networkx as nx
+        except ImportError:
+            raise ImportError("NetworkX is required for the 'topo_any' python module. Please install NetworkX and try again.")
+        
         # Handle file path input
         if isinstance(graph_input, str):
             if not os.path.exists(graph_input):
@@ -228,7 +253,7 @@ class topoAny(Topology):
         self.simple_routing_table = self.calculate_routing_table()
 
     def build(self, endpoint):
-        if self.loaded_graph.number_of_nodes() == 0 or self.loaded_graph.number_of_edges() == 0:
+        if self.loaded_graph is None or self.loaded_graph.number_of_nodes() == 0 or self.loaded_graph.number_of_edges() == 0:
             raise AssertionError("Invalid graph data, please assign valid graph data via import_graph() before build().")
 
         # Create routers
