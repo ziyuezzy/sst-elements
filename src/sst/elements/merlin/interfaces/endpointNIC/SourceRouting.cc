@@ -308,6 +308,7 @@ routing_entries SourceRoutingPlugin::parseRoutingEntryFromString(const std::stri
 }
 
 void SourceRoutingPlugin::setSourceRoutingEntriesForSourceRtr(const routing_entries& entries, int src_router) {
+    //! The shared array cannot be written outside init, so this will probably not work
     routing_table_shared.write(src_router, entries);
     routing_table_shared.publish();
 }

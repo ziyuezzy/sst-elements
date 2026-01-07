@@ -66,9 +66,9 @@ if __name__ == "__main__":
     # Add source routing plugin
     endpointNIC.addPlugin("sourceRoutingPlugin", routing_table=routing_table)
 
-    # Add traffic tracing plugin - this will generate CSV output
-    endpointNIC.addPlugin("trafficTracingPlugin",
-                         csv_filename="traffic_trace_slimfly.csv",
+    # Add packet tracing plugin - this will generate CSV output
+    endpointNIC.addPlugin("packetTracingPlugin",
+                         csv_filename="packet_trace_slimfly.csv",
                          enable_tracing=True)
 
     #### the following parameters will be passed down to linkcontrol via callback

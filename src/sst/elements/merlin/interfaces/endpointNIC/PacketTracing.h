@@ -13,33 +13,32 @@
 // information, see the LICENSE file in the top level directory of the
 // distribution.
 
-#ifndef COMPONENTS_MERLIN_TRAFFICTRACING_H
-#define COMPONENTS_MERLIN_TRAFFICTRACING_H
+#ifndef COMPONENTS_MERLIN_PACKETTRACING_H
+#define COMPONENTS_MERLIN_PACKETTRACING_H
 
 #include "NICPlugin.h"
 #include "../ExtendedRequest.h"
 #include <sst/core/output.h>
 #include <fstream>
 #include <string>
-#include <atomic>
 #include <mutex>
+#include <atomic>
 
 namespace SST {
 namespace Merlin {
 
-// TrafficTracingMetadata is now defined in ExtendedRequest.h
+// PacketTracingMetadata is defined in ExtendedRequest.h
 
-class TrafficTracingPlugin : public NICPlugin
+class PacketTracingPlugin : public NICPlugin
 {
 private:
-    // Static shared packet ID counter across all endpoints (atomic for thread safety)
+    // Shared packet ID counter across all endpoints (static atomic for runtime access)
     static std::atomic<uint64_t> global_packet_id;
 
-    // Static shared CSV file handle and mutex for thread-safe I/O
+    // Per-rank CSV file management (file I/O is not shared across MPI ranks)
     static std::ofstream csv_file;
     static std::mutex csv_mutex;
     static bool csv_initialized;
-    static std::string csv_filename;
 
     SST::Interfaces::SimpleNetwork::nid_t endpoint_id;
     Output output;
@@ -47,21 +46,21 @@ private:
 
 public:
     SST_ELI_REGISTER_SUBCOMPONENT(
-        TrafficTracingPlugin,
+        PacketTracingPlugin,
         "merlin",
-        "trafficTracingPlugin",
+        "packetTracingPlugin",
         SST_ELI_ELEMENT_VERSION(1,0,0),
-        "Traffic tracing plugin that logs packet injection/ejection events to CSV",
+        "Packet tracing plugin that logs packet injection/ejection events to CSV",
         SST::Merlin::NICPlugin
     )
 
     SST_ELI_DOCUMENT_PARAMS(
-        {"csv_filename", "Output CSV filename for traffic traces", "traffic_trace.csv"},
-        {"enable_tracing", "Enable/disable traffic tracing", "true"}
+        {"csv_filename", "Output CSV filename for packet traces", "packet_trace.csv"},
+        {"enable_tracing", "Enable/disable packet tracing", "true"}
     )
 
-    TrafficTracingPlugin(ComponentId_t cid, Params& params);
-    virtual ~TrafficTracingPlugin();
+    PacketTracingPlugin(ComponentId_t cid, Params& params);
+    virtual ~PacketTracingPlugin();
 
     // NICPlugin interface
     virtual SST::Interfaces::SimpleNetwork::Request* processOutgoing(
@@ -70,7 +69,7 @@ public:
     virtual SST::Interfaces::SimpleNetwork::Request* processIncoming(
         SST::Interfaces::SimpleNetwork::Request* req, int vn) override;
 
-    virtual std::string getPluginName() const override { return "TrafficTracingPlugin"; }
+    virtual std::string getPluginName() const override { return "PacketTracingPlugin"; }
 
     virtual void plugin_init(unsigned int phase) override;
     virtual void plugin_finish() override;

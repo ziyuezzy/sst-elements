@@ -82,8 +82,8 @@ libmerlin_la_SOURCES = \
     interfaces/endpointNIC/NICPlugin.h \
     interfaces/endpointNIC/SourceRouting.h \
     interfaces/endpointNIC/SourceRouting.cc \
-    interfaces/endpointNIC/TrafficTracing.h \
-    interfaces/endpointNIC/TrafficTracing.cc \
+    interfaces/endpointNIC/PacketTracing.h \
+    interfaces/endpointNIC/PacketTracing.cc \
 	arbitration/single_arb.h \
 	arbitration/single_arb_lru.h \
 	arbitration/single_arb_rr.h \

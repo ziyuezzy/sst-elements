@@ -14,21 +14,20 @@
 // distribution.
 
 #include <sst_config.h>
-#include "TrafficTracing.h"
+#include "PacketTracing.h"
 #include <sstream>
 #include <iomanip>
 
 namespace SST {
 namespace Merlin {
 
-// Initialize static members
-std::atomic<uint64_t> TrafficTracingPlugin::global_packet_id(0);
-std::ofstream TrafficTracingPlugin::csv_file;
-std::mutex TrafficTracingPlugin::csv_mutex;
-bool TrafficTracingPlugin::csv_initialized = false;
-std::string TrafficTracingPlugin::csv_filename = "";
+// Initialize static members (per-rank)
+std::atomic<uint64_t> PacketTracingPlugin::global_packet_id(0);
+std::ofstream PacketTracingPlugin::csv_file;
+std::mutex PacketTracingPlugin::csv_mutex;
+bool PacketTracingPlugin::csv_initialized = false;
 
-TrafficTracingPlugin::TrafficTracingPlugin(ComponentId_t cid, Params& params) :
+PacketTracingPlugin::PacketTracingPlugin(ComponentId_t cid, Params& params) :
     NICPlugin(cid, params),
     endpoint_id(-1),
     enable_tracing(false)
@@ -38,7 +37,7 @@ TrafficTracingPlugin::TrafficTracingPlugin(ComponentId_t cid, Params& params) :
     // Get endpoint ID from params
     endpoint_id = params.find<SST::Interfaces::SimpleNetwork::nid_t>("EP_id", -1);
     if (endpoint_id == static_cast<SST::Interfaces::SimpleNetwork::nid_t>(-1)) {
-        output.fatal(CALL_INFO, -1, "EP_id parameter not provided to TrafficTracingPlugin\n");
+        output.fatal(CALL_INFO, -1, "EP_id parameter not provided to PacketTracingPlugin\n");
     }
 
     // Check if tracing is enabled
@@ -47,40 +46,39 @@ TrafficTracingPlugin::TrafficTracingPlugin(ComponentId_t cid, Params& params) :
     // Only initialize CSV if tracing is enabled
     if (enable_tracing) {
         // Get CSV filename (only initialize once, with mutex protection)
-        std::string filename = params.find<std::string>("csv_filename", "traffic_trace.csv");
+        std::string filename = params.find<std::string>("csv_filename", "packet_trace.csv");
 
         // Use mutex to ensure only one thread initializes the CSV file
         std::lock_guard<std::mutex> lock(csv_mutex);
         if (!csv_initialized) {
-            csv_filename = filename;
             csv_initialized = true;
             initCSV(filename);
         }
     }
 }
 
-TrafficTracingPlugin::~TrafficTracingPlugin() {
+PacketTracingPlugin::~PacketTracingPlugin() {
 }
 
-void TrafficTracingPlugin::plugin_init(unsigned int phase) {
+void PacketTracingPlugin::plugin_init(unsigned int phase) {
     // Nothing to do during init phases
 }
 
-void TrafficTracingPlugin::plugin_finish() {
+void PacketTracingPlugin::plugin_finish() {
     // Close CSV file on finish (only once, with mutex protection)
     std::lock_guard<std::mutex> lock(csv_mutex);
     if (csv_file.is_open() && endpoint_id == 0) {
         csv_file.close();
-        output.verbose(CALL_INFO, 1, 0, "Closed traffic trace CSV file\n");
+        output.verbose(CALL_INFO, 1, 0, "Closed packet trace CSV file\n");
     }
 }
 
-void TrafficTracingPlugin::initCSV(const std::string& filename) {
+void PacketTracingPlugin::initCSV(const std::string& filename) {
     // Note: This method should only be called when csv_mutex is already locked
     csv_file.open(filename, std::ios::out | std::ios::trunc);
 
     if (!csv_file.is_open()) {
-        output.fatal(CALL_INFO, -1, "Failed to open CSV file for traffic tracing: %s\n",
+        output.fatal(CALL_INFO, -1, "Failed to open CSV file for packet tracing: %s\n",
                     filename.c_str());
     }
 
@@ -88,14 +86,15 @@ void TrafficTracingPlugin::initCSV(const std::string& filename) {
     csv_file << "time_ns,srcNIC,destNIC,Size_Bytes,pkt_id,event_type\n";
     csv_file.flush();
 
-    output.verbose(CALL_INFO, 1, 0, "Initialized traffic trace CSV: %s\n", filename.c_str());
+    output.verbose(CALL_INFO, 1, 0, "Initialized packet trace CSV: %s\n", filename.c_str());
 }
 
-uint64_t TrafficTracingPlugin::assignPacketID() {
+uint64_t PacketTracingPlugin::assignPacketID() {
+    // Atomically increment and return the packet ID
     return global_packet_id.fetch_add(1);
 }
 
-void TrafficTracingPlugin::logPacketEvent(
+void PacketTracingPlugin::logPacketEvent(
     const std::string& event_type,
     uint64_t pkt_id,
     SST::Interfaces::SimpleNetwork::nid_t src,
@@ -122,7 +121,7 @@ void TrafficTracingPlugin::logPacketEvent(
 
 }
 
-SST::Interfaces::SimpleNetwork::Request* TrafficTracingPlugin::processOutgoing(
+SST::Interfaces::SimpleNetwork::Request* PacketTracingPlugin::processOutgoing(
     SST::Interfaces::SimpleNetwork::Request* req, int vn)
 {
     if (!req) return nullptr;
@@ -141,8 +140,8 @@ SST::Interfaces::SimpleNetwork::Request* TrafficTracingPlugin::processOutgoing(
 
     // Assign packet ID and store in metadata
     uint64_t pkt_id = assignPacketID();
-    TrafficTracingMetadata trace_meta(pkt_id);
-    ext_req->setMetadata("TrafficTracing", trace_meta);
+    PacketTracingMetadata trace_meta(pkt_id);
+    ext_req->setMetadata("PacketTracing", trace_meta);
 
     // Log injection event (packet going IN to the network)
     size_t size_bytes = (ext_req->size_in_bits + 7) / 8;  // Convert bits to bytes
@@ -151,7 +150,7 @@ SST::Interfaces::SimpleNetwork::Request* TrafficTracingPlugin::processOutgoing(
     return ext_req;
 }
 
-SST::Interfaces::SimpleNetwork::Request* TrafficTracingPlugin::processIncoming(
+SST::Interfaces::SimpleNetwork::Request* PacketTracingPlugin::processIncoming(
     SST::Interfaces::SimpleNetwork::Request* req, int vn)
 {
     if (!req) return nullptr;
@@ -166,14 +165,14 @@ SST::Interfaces::SimpleNetwork::Request* TrafficTracingPlugin::processIncoming(
 
     if (ext_req) {
         // Retrieve packet ID from metadata
-        TrafficTracingMetadata trace_meta;
-        if (ext_req->getMetadata("TrafficTracing", trace_meta)) {
+        PacketTracingMetadata trace_meta;
+        if (ext_req->getMetadata("PacketTracing", trace_meta)) {
             // Log ejection event (packet coming OUT of the network)
             size_t size_bytes = (ext_req->size_in_bits + 7) / 8;  // Convert bits to bytes
             logPacketEvent("out", trace_meta.pkt_id, ext_req->src, ext_req->dest, size_bytes);
         } else {
             output.verbose(CALL_INFO, 2, 0,
-                "Warning: Incoming packet missing TrafficTracing metadata\n");
+                "Warning: Incoming packet missing PacketTracing metadata\n");
         }
     }
 
