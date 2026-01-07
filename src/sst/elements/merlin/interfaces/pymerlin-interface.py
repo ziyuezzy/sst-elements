@@ -161,6 +161,25 @@ class SourceRoutingPlugin(NICplugin):
 
         return thisPlugin # just to be consistent with the parent class build() method
 
+class TrafficTracingPlugin(NICplugin):
+    PluginName = "trafficTracingPlugin"
+    PluginFullName = "merlin.trafficTracingPlugin"
+
+    def __init__(self):
+        NICplugin.__init__(self)
+
+    def build(self, endpointNIC_sstcomp, endpointID, plugin_index, **kwargs):
+        thisPlugin = super().build(endpointNIC_sstcomp, endpointID, plugin_index, **kwargs)
+
+        # Get optional CSV filename from kwargs
+        csv_filename = kwargs.get("csv_filename", "traffic_trace.csv")
+        thisPlugin.addParam("csv_filename", csv_filename)
+
+        enable_tracing = kwargs.get("enable_tracing", True)
+        thisPlugin.addParam("enable_tracing", enable_tracing)
+
+        return thisPlugin
+
 
 ## ==============================================
 # Python classes for EndpointNIC

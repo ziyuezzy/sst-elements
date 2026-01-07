@@ -58,6 +58,7 @@ The main NIC component that:
 ### 3. PlugIn Implementations (e.g., `SourceRouting.h/cc`)
 Individual plugin modules that implement specific NIC functionality.
   - **SourceRoutingPlugin** (implemented) : Adds source routing headers to packets
+  - **TrafficTracingPlugin** (implemented) : Logs packet injection/ejection events to CSV for traffic analysis
   - ECMP entropy manipulation
   - RDMA: send RDMA writes directly to spcific addresses of the memory
   - Endpoint-to-endpoint flow control: need to monitor flow bandwidths and send control messages.
@@ -78,25 +79,49 @@ Network → LinkControl → ... → Plugin2 → Plugin1 → endpointNIC → Endp
 ## Usage Example (Python)
 
 ```python
-job = Job(job_id, size)
+from sst.merlin.base import *
+from sst.merlin.endpoint import *
+from sst.merlin.interface import *
+from sst.merlin.topology import *
+
+# Setup topology and routing table
+topo = topoAny()
+# ... configure topology ...
+routing_table = topo.calculate_routing_table()
+
+# Create endpointNIC with plugins
+endpointNIC = EndpointNIC(use_reorderLinkControl=True, topo=topo)
 
 # Add source routing plugin
-sr_params = {
-    "routing_string": "0:1.0,0,1,2|1:1.0,0,3,1",
-    "path_selection_algorithm": "random_weighted"
-}
-job.addEndpointNICPlugin("merlin.sourceRoutingPlugin", sr_params)
+endpointNIC.addPlugin("sourceRoutingPlugin", routing_table=routing_table)
 
-# Add more plugins as needed
-# job.addEndpointNICPlugin("merlin.ecmpPlugin", ecmp_params)
+# Add traffic tracing plugin to log packet events
+endpointNIC.addPlugin("trafficTracingPlugin",
+                     csv_filename="traffic_trace.csv",
+                     enable_tracing=True)
 
-# When you call job.build(), it will automatically use endpointNIC
-# if plugins were added, otherwise it uses the standard network interface
+# Configure endpoint with the NIC
+ep = OfferedLoadJob(0, topo.getNumNodes())
+ep.setEndpointNIC(endpointNIC)
+# ... configure endpoint ...
 ```
 
-The `addEndpointNICPlugin()` method automatically sets `use_endpointNIC = True`. When `build()` is called, it will:
-- Use endpointNIC with the plugin pipeline if `use_endpointNIC` is True and plugins are configured
-- Use the standard network interface otherwise
+The traffic tracing plugin will generate a CSV file with the following format:
+```
+time_ns,srcNIC,destNIC,Size_Bytes,pkt_id,event_type
+400,40,41,46,0,in
+410,40,41,46,0,out
+...
+```
+
+Where:
+- `time_ns`: Simulation time in nanoseconds
+- `srcNIC`: Source endpoint ID
+- `destNIC`: Destination endpoint ID
+- `Size_Bytes`: Packet size in bytes
+- `pkt_id`: Unique packet identifier
+- `event_type`: "in" (injection) or "out" (ejection)
+
 
 ## Adding New Plugins
 
