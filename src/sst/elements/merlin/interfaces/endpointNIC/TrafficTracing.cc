@@ -30,7 +30,8 @@ std::string TrafficTracingPlugin::csv_filename = "";
 
 TrafficTracingPlugin::TrafficTracingPlugin(ComponentId_t cid, Params& params) :
     NICPlugin(cid, params),
-    endpoint_id(-1)
+    endpoint_id(-1),
+    enable_tracing(false)
 {
     output.init(getName() + ": ", 0, 0, Output::STDOUT);
 
@@ -40,15 +41,21 @@ TrafficTracingPlugin::TrafficTracingPlugin(ComponentId_t cid, Params& params) :
         output.fatal(CALL_INFO, -1, "EP_id parameter not provided to TrafficTracingPlugin\n");
     }
 
-    // Get CSV filename (only initialize once, with mutex protection)
-    std::string filename = params.find<std::string>("csv_filename", "traffic_trace.csv");
+    // Check if tracing is enabled
+    enable_tracing = params.find<bool>("enable_tracing", true);
 
-    // Use mutex to ensure only one thread initializes the CSV file
-    std::lock_guard<std::mutex> lock(csv_mutex);
-    if (!csv_initialized) {
-        csv_filename = filename;
-        csv_initialized = true;
-        initCSV(filename);
+    // Only initialize CSV if tracing is enabled
+    if (enable_tracing) {
+        // Get CSV filename (only initialize once, with mutex protection)
+        std::string filename = params.find<std::string>("csv_filename", "traffic_trace.csv");
+
+        // Use mutex to ensure only one thread initializes the CSV file
+        std::lock_guard<std::mutex> lock(csv_mutex);
+        if (!csv_initialized) {
+            csv_filename = filename;
+            csv_initialized = true;
+            initCSV(filename);
+        }
     }
 }
 
@@ -113,14 +120,17 @@ void TrafficTracingPlugin::logPacketEvent(
              << pkt_id << ","
              << event_type << "\n";
 
-    // Flush to ensure data is written immediately (important for crash recovery)
-    csv_file.flush();
 }
 
 SST::Interfaces::SimpleNetwork::Request* TrafficTracingPlugin::processOutgoing(
     SST::Interfaces::SimpleNetwork::Request* req, int vn)
 {
     if (!req) return nullptr;
+
+    // If tracing is disabled, just pass through without any overhead
+    if (!enable_tracing) {
+        return req;
+    }
 
     // Convert to ExtendedRequest if not already
     ExtendedRequest* ext_req = dynamic_cast<ExtendedRequest*>(req);
@@ -145,6 +155,11 @@ SST::Interfaces::SimpleNetwork::Request* TrafficTracingPlugin::processIncoming(
     SST::Interfaces::SimpleNetwork::Request* req, int vn)
 {
     if (!req) return nullptr;
+
+    // If tracing is disabled, just pass through without any overhead
+    if (!enable_tracing) {
+        return req;
+    }
 
     // Try to get ExtendedRequest to retrieve packet ID
     ExtendedRequest* ext_req = dynamic_cast<ExtendedRequest*>(req);

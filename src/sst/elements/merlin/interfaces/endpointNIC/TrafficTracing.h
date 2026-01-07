@@ -27,13 +27,7 @@
 namespace SST {
 namespace Merlin {
 
-// Metadata for packet tracking
-struct TrafficTracingMetadata {
-    uint64_t pkt_id;
-
-    TrafficTracingMetadata() : pkt_id(0) {}
-    TrafficTracingMetadata(uint64_t id) : pkt_id(id) {}
-};
+// TrafficTracingMetadata is now defined in ExtendedRequest.h
 
 class TrafficTracingPlugin : public NICPlugin
 {
@@ -49,6 +43,7 @@ private:
 
     SST::Interfaces::SimpleNetwork::nid_t endpoint_id;
     Output output;
+    bool enable_tracing;
 
 public:
     SST_ELI_REGISTER_SUBCOMPONENT(

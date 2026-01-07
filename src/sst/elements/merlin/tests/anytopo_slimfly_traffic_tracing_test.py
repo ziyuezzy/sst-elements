@@ -27,7 +27,7 @@ from Slimfly import SlimflyTopo
 
 if __name__ == "__main__":
 
-    LOAD = 0.3
+    LOAD = 0.5
     UNIFIED_ROUTER_LINK_BW = 16
 
     # Create Slimfly topology
@@ -38,7 +38,7 @@ if __name__ == "__main__":
     ### Setup the topology
     topo = topoAny()
     topo.routing_mode = "source_routing"
-    topo.topo_name = "slimfly_with_tracing"
+    topo.topo_name = "slimfly"
     topo.import_graph(G)
 
     # Set up the routers
@@ -60,7 +60,7 @@ if __name__ == "__main__":
     # Calculate routing table
     routing_table = topo.calculate_routing_table()
 
-    ### use endpointNIC with traffic tracing
+    ### use endpointNIC
     endpointNIC = EndpointNIC(use_reorderLinkControl=True, topo=topo)
 
     # Add source routing plugin

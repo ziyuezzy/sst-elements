@@ -45,12 +45,21 @@ struct ReorderMetadata {
     ReorderMetadata(uint32_t seq) : seq_number(seq) {}
 };
 
+// Traffic tracing metadata
+struct TrafficTracingMetadata {
+    uint64_t pkt_id;
+
+    TrafficTracingMetadata() : pkt_id(0) {}
+    TrafficTracingMetadata(uint64_t id) : pkt_id(id) {}
+};
+
 // Variant type for all supported metadata types
 // Add new metadata types here as needed
 using MetadataVariant = std::variant<
     std::monostate,  // Empty/uninitialized state
     SourceRoutingMetadata,
-    ReorderMetadata
+    ReorderMetadata,
+    TrafficTracingMetadata
 >;
 
 // Extended Request that plugins can attach metadata to
@@ -168,6 +177,9 @@ public:
                 } else if (type_index == 2) {  // ReorderMetadata
                     auto data = std::get<ReorderMetadata>(pair.second);
                     ser & data.seq_number;
+                } else if (type_index == 3) {  // TrafficTracingMetadata
+                    auto data = std::get<TrafficTracingMetadata>(pair.second);
+                    ser & data.pkt_id;
                 }
             }
             break;
@@ -188,6 +200,10 @@ public:
                     uint32_t seq_number;
                     ser & seq_number;
                     metadata[key] = ReorderMetadata(seq_number);
+                } else if (type_index == 3) {  // TrafficTracingMetadata
+                    uint64_t pkt_id;
+                    ser & pkt_id;
+                    metadata[key] = TrafficTracingMetadata(pkt_id);
                 }
             }
             break;
