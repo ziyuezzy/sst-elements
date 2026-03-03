@@ -164,6 +164,29 @@ class SourceRoutingPlugin(NICplugin):
 
         return thisPlugin # just to be consistent with the parent class build() method
 
+class DemandMatrixPlugin(NICplugin):
+    PluginName = "demandMatrixPlugin"
+    PluginFullName = "merlin.demandMatrixPlugin"
+
+    def __init__(self):
+        NICplugin.__init__(self)
+        self._declareParams("params", ["metric"])
+
+    def build(self, endpointNIC_sstcomp, endpointID, plugin_index, **kwargs):
+        thisPlugin = super().build(endpointNIC_sstcomp, endpointID, plugin_index, **kwargs)
+        thisPlugin.addGlobalParamSet("params")
+
+        # Get topology to retrieve total number of endpoints
+        topology = kwargs.get("topology", None)
+        if topology is not None:
+            num_peers = topology.getNumNodes()
+            thisPlugin.addParam("num_peers", num_peers)
+        else:
+            # If no topology provided, user must set num_peers manually
+            pass
+
+        return thisPlugin
+
 
 ## ==============================================
 # Python classes for EndpointNIC
@@ -217,6 +240,9 @@ class EndpointNIC(NetworkInterface):
         if isinstance(plugin, SourceRoutingPlugin):
             assert(self.topology is not None), "Topology must be provided to EndpointNIC when using sourceRoutingPlugin."
             kwargs['topology'] = self.topology
+        elif isinstance(plugin, DemandMatrixPlugin):
+            if self.topology is not None:
+                kwargs['topology'] = self.topology
 
     def _network_interface_callback(self, variable_name, value):
         if not value: return
